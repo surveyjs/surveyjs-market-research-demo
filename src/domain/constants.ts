@@ -1,0 +1,23 @@
+export const DEVICES = ['Mobile', 'Desktop', 'Laptop', 'Mobile + Laptop', 'Tablet'] as const;
+export const SHOPPING_FREQUENCIES = ['Weekly', 'Monthly', 'Occasionally', 'Rarely'] as const;
+export const RECRUITMENT_SOURCES = ['Website signup', 'Referral', 'Panel partner', 'Social media', 'Other'] as const;
+export const CONSENT_STATUSES = ['Consented', 'Pending', 'Withdrawn'] as const;
+export const PARTICIPANT_STATUSES = ['Active', 'Inactive', 'Do not contact'] as const;
+export const SEGMENTS = ['Frequent Online Shopper', 'High Street Regular', 'Occasional Buyer', 'Mobile-first Shopper'] as const;
+export const PARTICIPATION_METHODS = ['Online Survey', 'Video Interview', 'Focus Group', 'In-person Interview', 'Other'] as const;
+export const PARTICIPATION_STATUSES = ['Invited', 'Scheduled', 'Completed', 'Declined', 'No-show', 'Cancelled'] as const;
+export const RECRUITED_STATUSES = ['Invited', 'Scheduled', 'Completed'] as const;
+export const PROJECT_STATUSES = ['Draft', 'Planned', 'Recruiting', 'Fieldwork', 'Completed', 'Paused', 'Cancelled'] as const;
+export const SURVEY_STATUSES = ['Draft', 'Active', 'Paused', 'Archived'] as const;
+export const SCREENER_STATUSES = ['Draft', 'Active', 'Archived'] as const;
+export const INCENTIVE_TYPES = ['Voucher', 'Cash', 'Gift card'] as const;
+export const INCENTIVE_STATUSES = ['Pending', 'Approved', 'Issued', 'Cancelled'] as const;
+export const AGE_BRACKETS = ['18–24', '25–34', '35–44', '45–54', '55+'] as const;
+export const SHOPPING_CHANNELS = ['Online', 'In-store', 'Both equally'] as const;
+export const INCOME_RANGES = ['Under £35,000', '£35,000–£49,999', '£50,000–£74,999', '£75,000+'] as const;
+export const YES_NO = ['Yes', 'No'] as const;
+export const RULE_OPERATORS = ['eq', 'neq', 'in', 'nin', 'empty', 'notEmpty'] as const;
+export const QUALIFICATION_STATUSES = ['Qualified', 'Disqualified', 'Pending review'] as const;
+
+export const DEMO_PASSWORD = 'demo1234';
+export const SCHEMA_VERSION = 1;

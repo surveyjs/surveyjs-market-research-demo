@@ -1,0 +1,35 @@
+body {
+  min-height: 100vh;
+  background: var(--bs-body-bg);
+}
+
+.navbar-brand,
+.page-title {
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.app-card {
+  box-shadow: 0 0.125rem 0.5rem rgba(var(--bs-body-color-rgb), 0.08);
+}
+
+.survey-host .sd-root-modern,
+.survey-host .sd-root-modern.sd-root-modern {
+  background: transparent;
+}
+
+.creator-host {
+  height: calc(100vh - 78px);
+}
+
+.creator-host .svc-creator {
+  height: 100%;
+}
+
+.modal-dialog.survey-modal .modal-body {
+  overflow: visible;
+}
+
+.toast {
+  min-width: 16rem;
+}
