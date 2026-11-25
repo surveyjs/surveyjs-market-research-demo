@@ -3,14 +3,34 @@ body {
   background: var(--bs-body-bg);
 }
 
+.btn {
+  --bs-btn-padding-y: 0.375rem;
+  --bs-btn-padding-x: 0.75rem;
+}
+
+.btn-sm {
+  --bs-btn-padding-y: 0.25rem;
+  --bs-btn-padding-x: 0.5rem;
+}
+
+.navbar {
+  --bs-navbar-padding-y: 0.5rem;
+}
+
+.card {
+  --bs-card-spacer-y: 1rem;
+  --bs-card-spacer-x: 1rem;
+  --bs-card-cap-padding-y: 0.5rem;
+  --bs-card-cap-padding-x: 1rem;
+}
+
 .navbar-brand,
 .page-title {
-  font-weight: 600;
-  letter-spacing: -0.02em;
+  font-weight: 500;
 }
 
 .app-card {
-  box-shadow: 0 0.125rem 0.5rem rgba(var(--bs-body-color-rgb), 0.08);
+  box-shadow: var(--bs-box-shadow-sm);
 }
 
 .survey-host .sd-root-modern,
@@ -18,18 +38,256 @@ body {
   background: transparent;
 }
 
+/* Bootstrap form groups use 1rem. The adapter leaves page rows on the 40px SurveyJS step.
+   The adapter also maps the survey header to h2 (2rem). Card titles in this app are h5. */
+.survey-host .sjs-theme-overrides {
+  --sjs2-layout-component-page-content-area-gap-vertical: 1rem;
+  --sjs2-layout-component-page-content-area-gap-horizontal: 1rem;
+  --sjs-bs-card-spacer-x: 1rem;
+  --sjs-bs-card-cap-padding-y: 0.5rem;
+  --sjs-bs-card-cap-padding-x: 1rem;
+  --sjs-bs-matrix-cell-padding: 0.5rem;
+  --sjs2-typography-font-size-component-survey-header-title: 1.25rem;
+  --sjs2-typography-line-height-component-survey-header-title: 1.2;
+}
+
+/* The dropdown list uses the 16px body size. Zephyr inputs and .dropdown-item use 0.875rem.
+   Those dropdown variables exist only on .dropdown-menu, so the lengths are written here.
+   The popup sits outside the question, so the input token does not reach the list. */
+.sv-dropdown-popup {
+  --sjs2-typography-font-size-default: 0.875rem;
+  --sjs2-typography-line-height-default: var(--bs-body-line-height);
+  --sjs2-layout-component-drop-item-box-padding-vertical: 0.5rem;
+  --sjs2-layout-component-drop-item-box-padding-left: 1rem;
+  --sjs2-layout-component-drop-item-box-padding-right: 1rem;
+  --sjs2-layout-component-drop-item-label-padding-horizontal: 0;
+}
+
 .creator-host {
-  height: calc(100vh - 78px);
+  height: calc(100vh - 7.5rem);
+  min-height: 24rem;
 }
 
 .creator-host .svc-creator {
   height: 100%;
 }
 
+.modal.d-block {
+  overflow: hidden;
+}
+
+.modal-dialog.survey-modal.modal-dialog-scrollable {
+  height: auto;
+  max-height: calc(100% - var(--bs-modal-margin) * 2);
+  min-height: 0;
+}
+
+.modal-dialog.survey-modal .modal-content {
+  max-height: calc(100vh - var(--bs-modal-margin) * 2);
+  overflow: hidden;
+}
+
 .modal-dialog.survey-modal .modal-body {
-  overflow: visible;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .toast {
   min-width: 16rem;
+}
+
+.demo-dock {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 2000;
+  display: flex;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0.25rem;
+  border: 1px solid var(--bs-border-color);
+  border-radius: 50rem;
+  background: color-mix(in srgb, var(--bs-body-bg) 92%, transparent);
+  box-shadow: var(--bs-box-shadow);
+}
+
+.demo-dock .btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  border-radius: 50rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.demo-dock .btn[aria-pressed='true'] {
+  color: var(--bs-primary);
+  background: rgba(var(--bs-primary-rgb), 0.12);
+}
+
+[data-survey-component] {
+  position: relative;
+}
+
+:root[data-survey-outlines='true'] [data-survey-component] {
+  outline: 2px dashed var(--bs-primary);
+  outline-offset: 4px;
+  box-shadow: 0 0 0 6px rgba(var(--bs-primary-rgb), 0.15);
+}
+
+#participant-search {
+  --search-inset: 1rem;
+}
+
+#participant-search .sd-root-modern.sjs-theme-overrides {
+  --sjs2-layout-component-survey-box-padding-top: var(--search-inset);
+  --sjs2-layout-component-survey-box-padding-bottom: var(--search-inset);
+  --sjs2-layout-component-survey-box-gap-vertical: var(--search-inset);
+  --sjs2-layout-component-survey-header-gap-vertical: 0.5rem;
+  --sjs2-layout-component-survey-header-padding-horizontal: var(--search-inset);
+  --sjs2-layout-component-page-box-gap-vertical: 0;
+  --sjs2-layout-component-page-content-area-padding-horizontal: 0;
+  --sjs2-layout-component-page-content-area-gap-horizontal: var(--search-inset);
+  --sjs2-layout-component-page-content-area-gap-vertical: var(--search-inset);
+  --sjs2-layout-component-survey-footer-padding-horizontal: 0;
+  --sjs2-layout-component-survey-footer-padding-top: 0;
+  --sjs2-layout-component-survey-footer-padding-bottom: 0;
+  --sjs2-layout-component-question-header-padding-bottom: 0;
+  --sjs2-layout-component-question-box-gap-vertical: 0.5rem;
+}
+
+#participant-search .sd-container-modern {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+#participant-search .sd-container-modern > .sv-components-row,
+#participant-search .sd-container-modern > .search-footer-actions {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+#participant-search .sd-container-modern > .sd-container-modern__title {
+  box-shadow: none;
+  background: transparent;
+  min-width: 0;
+  padding-block: 0.5rem;
+}
+
+#participant-search .search-header-actions,
+#participant-search .search-footer-actions {
+  box-sizing: border-box;
+  width: 100%;
+  gap: 0.5rem;
+  padding-inline: var(--search-inset);
+}
+
+#participant-search .search-header-actions {
+  justify-content: flex-end;
+  padding-bottom: var(--search-inset);
+}
+
+#participant-search .search-footer-actions {
+  grid-column: 1 / -1;
+  flex-direction: column;
+  align-items: stretch;
+  padding-bottom: var(--search-inset);
+}
+
+#participant-search .search-header-actions .sd-action,
+#participant-search .search-footer-actions .sd-action {
+  width: 100%;
+}
+
+#participant-search .sd-body {
+  padding-inline: var(--search-inset);
+}
+
+#participant-search .sd-row {
+  align-items: flex-end;
+  gap: var(--search-inset);
+}
+
+/* SurveyJS sizes each field at 33% plus the row gap, so the third field wraps off the card. */
+#participant-search .sd-row > .sd-element-wrapper {
+  flex: 1 1 14rem !important;
+  width: auto !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  margin: 0;
+  padding: 0;
+}
+
+@media (min-width: 768px) {
+  #participant-search .sd-container-modern {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  #participant-search .search-header-actions {
+    width: max-content;
+    justify-content: flex-end;
+    padding-block: 0.5rem;
+  }
+
+  #participant-search .search-footer-actions {
+    flex-direction: row;
+    justify-content: flex-start;
+  }
+
+  #participant-search .search-header-actions .sd-action,
+  #participant-search .search-footer-actions .sd-action {
+    width: auto;
+  }
+}
+
+.record-grid .sd-element--with-frame,
+.record-grid .sd-question {
+  padding: 0;
+  box-shadow: none;
+}
+
+.record-grid .sd-question__header,
+.record-grid .sd-question__content {
+  padding: 0;
+}
+
+.record-grid .sd-table-wrapper {
+  overflow-x: auto;
+}
+
+.record-grid .sd-table__cell input,
+.record-grid .sd-table__cell .sd-text,
+.record-grid .sd-table__cell .form-control {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+  min-height: 0;
+  height: auto;
+  pointer-events: none;
+  color: inherit;
+}
+
+.record-grid .sd-pager {
+  padding: 0.5rem 0.75rem 0.75rem;
+}
+
+:root[data-survey-outlines='true'] [data-survey-component]::after {
+  content: attr(data-survey-component);
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 5;
+  padding: 0.125rem 0.5rem;
+  border-radius: 0 var(--bs-border-radius) 0 var(--bs-border-radius);
+  background: var(--bs-primary);
+  color: var(--bs-white);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  line-height: 1.6;
+  text-transform: uppercase;
+  pointer-events: none;
 }

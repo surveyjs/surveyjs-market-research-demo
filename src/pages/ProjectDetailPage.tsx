@@ -6,11 +6,12 @@ import { fieldworkLabel, formatDate, recruitmentLabel } from '../domain/format';
 import { errorMessage } from '../repositories/api';
 import { formRepository } from '../repositories/formRepository';
 import { researchRepository } from '../repositories/researchRepository';
+import { RecordGrid } from '../survey/RecordGrid';
 import { SurveyDialog } from '../survey/SurveyDialog';
 import { CreatorState } from '../types/creator';
 import { AuthUser } from '../types/auth';
 import { canDesign, canWrite } from '../ui/access';
-import { PageHeader, PageState, StatusBadge, useAsync, useDocumentTitle } from '../ui/components';
+import { PageHeader, PageState, StatusBadge, statusBadgeHtml, useAsync, useDocumentTitle } from '../ui/components';
 
 export function ProjectDetailPage({
   user,
@@ -63,13 +64,13 @@ export function ProjectDetailPage({
             actions={
               writing ? (
                 <>
-                  <button type="button" className="btn btn-outline-primary" onClick={() => setEditing(true)}>
+                  <button type="button" className="btn btn-sm btn-outline-primary" onClick={() => setEditing(true)}>
                     Edit project
                   </button>
-                  <button type="button" className="btn btn-outline-primary" onClick={() => setParticipation(true)}>
+                  <button type="button" className="btn btn-sm btn-outline-primary" onClick={() => setParticipation(true)}>
                     Add participation
                   </button>
-                  <button type="button" className="btn btn-primary" onClick={() => setSending(true)}>
+                  <button type="button" className="btn btn-sm btn-primary" onClick={() => setSending(true)}>
                     Send screener
                   </button>
                 </>
@@ -112,7 +113,7 @@ export function ProjectDetailPage({
               <section className="card app-card h-100">
                 <div className="card-body">
                   <h2 className="h5">Recruitment</h2>
-                  <p className="display-6 mb-1">{project.recruited}</p>
+                  <p className="fs-4 fw-semibold mb-1">{project.recruited}</p>
                   <p className="text-secondary">{recruitmentLabel(project.recruited, project.recruitmentTarget, project.status)}</p>
                   <div
                     className="progress"
@@ -194,67 +195,44 @@ export function ProjectDetailPage({
                   {data.participants.length === 0 ? (
                     <p className="text-secondary">No participants are assigned yet.</p>
                   ) : (
-                    <div className="table-responsive">
-                      <table className="table align-middle">
-                        <thead>
-                          <tr>
-                            <th>Name</th>
-                            <th>ID</th>
-                            <th>City</th>
-                            <th>Status</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {data.participants.map((person) => (
-                            <tr key={person.id}>
-                              <td>
-                                <Link to={`/participants/${person.id}`}>{person.fullName}</Link>
-                              </td>
-                              <td>{person.participantCode}</td>
-                              <td>{person.city}</td>
-                              <td>
-                                <StatusBadge value={person.status} />
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                    <RecordGrid
+                      columns={[
+                        { name: 'name', title: 'Name', kind: 'link', minWidth: '10rem' },
+                        { name: 'code', title: 'ID', minWidth: '7rem' },
+                        { name: 'city', title: 'City', minWidth: '7rem' },
+                        { name: 'status', title: 'Status', kind: 'html', minWidth: '7rem' },
+                      ]}
+                      rows={data.participants.map((person) => ({
+                        id: person.id,
+                        name: person.fullName,
+                        nameHref: `/participants/${person.id}`,
+                        code: person.participantCode,
+                        city: person.city || '—',
+                        status: statusBadgeHtml(person.status),
+                      }))}
+                    />
                   )}
-                  <h3 className="h6">Participation records</h3>
+                  <h3 className="h6 mt-3">Participation records</h3>
                   {data.participations.length === 0 ? (
                     <p className="text-secondary mb-0">No participation records yet.</p>
                   ) : (
-                    <div className="table-responsive">
-                      <table className="table align-middle mb-0">
-                        <thead>
-                          <tr>
-                            <th>Participant</th>
-                            <th>Date</th>
-                            <th>Method</th>
-                            <th>Status</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {data.participations.slice(0, 12).map((item) => (
-                            <tr key={item.id}>
-                              <td>
-                                <Link to={`/participants/${item.participantId}`}>{item.participantName}</Link>
-                              </td>
-                              <td>{formatDate(item.participationDate)}</td>
-                              <td>{item.method}</td>
-                              <td>
-                                <StatusBadge value={item.status} />
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                    <RecordGrid
+                      columns={[
+                        { name: 'name', title: 'Participant', kind: 'link', minWidth: '10rem' },
+                        { name: 'date', title: 'Date', minWidth: '7rem' },
+                        { name: 'method', title: 'Method', minWidth: '8rem' },
+                        { name: 'status', title: 'Status', kind: 'html', minWidth: '7rem' },
+                      ]}
+                      rows={data.participations.map((item) => ({
+                        id: item.id,
+                        name: item.participantName,
+                        nameHref: `/participants/${item.participantId}`,
+                        date: formatDate(item.participationDate),
+                        method: item.method,
+                        status: statusBadgeHtml(item.status),
+                      }))}
+                    />
                   )}
-                  {data.participations.length > 12 ? (
-                    <p className="small text-secondary mt-2 mb-0">Showing 12 of {data.participations.length} records.</p>
-                  ) : null}
                 </div>
               </section>
             </div>

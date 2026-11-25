@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
 import { INCENTIVE_STATUSES } from '../domain/constants';
 import { formatDate, formatMoney } from '../domain/format';
 import { formRepository } from '../repositories/formRepository';
 import { researchRepository } from '../repositories/researchRepository';
+import { RecordGrid } from '../survey/RecordGrid';
 import { SurveyDialog } from '../survey/SurveyDialog';
 import { CreatorState } from '../types/creator';
 import { AuthUser } from '../types/auth';
 import { Incentive, Project } from '../types/research';
 import { canDesign, canWrite } from '../ui/access';
-import { EmptyState, PageHeader, PageState, StatusBadge, useAsync, useDocumentTitle } from '../ui/components';
+import { EmptyState, PageHeader, PageState, linkHtml, statusBadgeHtml, useAsync, useDocumentTitle } from '../ui/components';
 
 export function IncentivesPage({
   user,
@@ -73,47 +73,32 @@ export function IncentivesPage({
         {data && data.length === 0 ? (
           <EmptyState>No incentives match these filters.</EmptyState>
         ) : (
-          <div className="table-responsive card app-card">
-            <table className="table table-hover align-middle mb-0">
-              <thead>
-                <tr>
-                  <th>Participant</th>
-                  <th>Project</th>
-                  <th>Type</th>
-                  <th>Amount</th>
-                  <th>Status</th>
-                  <th className="d-none d-lg-table-cell">Updated</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {data?.map((item) => (
-                  <tr key={item.id}>
-                    <td>
-                      <Link to={`/participants/${item.participantId}`}>{item.participantName}</Link>
-                      <div className="small text-secondary">{item.participantCode}</div>
-                    </td>
-                    <td>
-                      <Link to={`/projects/${item.projectId}`}>{item.projectName}</Link>
-                      <div className="small text-secondary">{item.description}</div>
-                    </td>
-                    <td>{item.incentiveType}</td>
-                    <td>{formatMoney(item.amount)}</td>
-                    <td>
-                      <StatusBadge value={item.status} />
-                    </td>
-                    <td className="d-none d-lg-table-cell">{formatDate(item.updatedAt)}</td>
-                    <td className="text-end">
-                      {writing ? (
-                        <button type="button" className="btn btn-sm btn-outline-primary" onClick={() => setEditing(item)}>
-                          Edit
-                        </button>
-                      ) : null}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="card app-card">
+            <RecordGrid
+              columns={[
+                { name: 'participant', title: 'Participant', kind: 'html', minWidth: '10rem' },
+                { name: 'project', title: 'Project', kind: 'html', minWidth: '12rem' },
+                { name: 'type', title: 'Type', minWidth: '7rem' },
+                { name: 'amount', title: 'Amount', minWidth: '6rem' },
+                { name: 'status', title: 'Status', kind: 'html', minWidth: '7rem' },
+                { name: 'updated', title: 'Updated', minWidth: '8rem' },
+                ...(writing ? [{ name: 'edit', title: ' ', kind: 'action' as const, minWidth: '5rem' }] : []),
+              ]}
+              rows={(data ?? []).map((item) => ({
+                id: item.id,
+                participant: linkHtml(`/participants/${item.participantId}`, item.participantName, item.participantCode),
+                project: linkHtml(`/projects/${item.projectId}`, item.projectName, item.description),
+                type: item.incentiveType,
+                amount: formatMoney(item.amount),
+                status: statusBadgeHtml(item.status),
+                updated: formatDate(item.updatedAt),
+                edit: writing ? 'Edit' : '',
+              }))}
+              onAction={(_column, row) => {
+                const item = data?.find((entry) => entry.id === row.id);
+                if (item) setEditing(item);
+              }}
+            />
           </div>
         )}
       </PageState>

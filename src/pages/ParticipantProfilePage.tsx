@@ -4,12 +4,13 @@ import { SendScreenerDialog } from '../components/screeners/SendScreenerDialog';
 import { formatDate, formatDateTime, formatMoney } from '../domain/format';
 import { formRepository } from '../repositories/formRepository';
 import { researchRepository } from '../repositories/researchRepository';
+import { RecordGrid } from '../survey/RecordGrid';
 import { SurveyDialog } from '../survey/SurveyDialog';
 import { CreatorState } from '../types/creator';
 import { AuthUser } from '../types/auth';
 import { ScreeningRecord } from '../types/research';
 import { canDesign, canWrite } from '../ui/access';
-import { PageHeader, PageState, StatusBadge, useAsync, useDocumentTitle } from '../ui/components';
+import { escapeHtml, linkHtml, PageHeader, PageState, StatusBadge, statusBadgeHtml, useAsync, useDocumentTitle } from '../ui/components';
 
 export function ParticipantProfilePage({
   user,
@@ -46,7 +47,7 @@ export function ParticipantProfilePage({
               </li>
             </ol>
           </nav>
-          <section className="card app-card mb-4">
+          <section className="card app-card mb-3">
             <div className="card-body">
               <PageHeader
                 compact
@@ -55,13 +56,13 @@ export function ParticipantProfilePage({
                 actions={
                   writing ? (
                     <>
-                      <button type="button" className="btn btn-outline-primary" onClick={() => setEditing(true)}>
+                      <button type="button" className="btn btn-sm btn-outline-primary" onClick={() => setEditing(true)}>
                         Edit participant
                       </button>
-                      <button type="button" className="btn btn-outline-primary" onClick={() => setParticipation(true)}>
+                      <button type="button" className="btn btn-sm btn-outline-primary" onClick={() => setParticipation(true)}>
                         Add study participation
                       </button>
-                      <button type="button" className="btn btn-primary" onClick={() => setScreener(true)}>
+                      <button type="button" className="btn btn-sm btn-primary" onClick={() => setScreener(true)}>
                         Send screener
                       </button>
                     </>
@@ -126,42 +127,26 @@ export function ParticipantProfilePage({
                   {data.participations.length === 0 ? (
                     <p className="text-secondary mb-0">No participation records yet.</p>
                   ) : (
-                    <div className="table-responsive">
-                      <table className="table align-middle mb-0">
-                        <thead>
-                          <tr>
-                            <th>Study</th>
-                            <th>Date</th>
-                            <th>Method</th>
-                            <th>Incentive</th>
-                            <th>Status</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {data.participations.map((item) => (
-                            <tr key={item.id}>
-                              <td>
-                                <Link to={`/projects/${item.projectId}`}>{item.studyName}</Link>
-                                {item.notes ? <div className="small text-secondary">{item.notes}</div> : null}
-                              </td>
-                              <td>{formatDate(item.participationDate)}</td>
-                              <td>{item.method}</td>
-                              <td>
-                                {item.incentiveDescription || '—'}
-                                {item.incentiveAmount != null ? (
-                                  <div className="small text-secondary">
-                                    {formatMoney(item.incentiveAmount)} · {item.incentiveStatus}
-                                  </div>
-                                ) : null}
-                              </td>
-                              <td>
-                                <StatusBadge value={item.status} />
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                    <RecordGrid
+                      columns={[
+                        { name: 'study', title: 'Study', kind: 'html', minWidth: '10rem' },
+                        { name: 'date', title: 'Date', minWidth: '7rem' },
+                        { name: 'method', title: 'Method', minWidth: '8rem' },
+                        { name: 'incentive', title: 'Incentive', kind: 'html', minWidth: '10rem' },
+                        { name: 'status', title: 'Status', kind: 'html', minWidth: '7rem' },
+                      ]}
+                      rows={data.participations.map((item) => ({
+                        id: item.id,
+                        study: linkHtml(`/projects/${item.projectId}`, item.studyName, item.notes || undefined),
+                        date: formatDate(item.participationDate),
+                        method: item.method,
+                        incentive:
+                          item.incentiveAmount != null
+                            ? `${escapeHtml(item.incentiveDescription || '—')}<div class="small text-secondary">${escapeHtml(`${formatMoney(item.incentiveAmount)} · ${item.incentiveStatus ?? ''}`)}</div>`
+                            : escapeHtml(item.incentiveDescription || '—'),
+                        status: statusBadgeHtml(item.status),
+                      }))}
+                    />
                   )}
                 </div>
               </section>
@@ -173,36 +158,27 @@ export function ParticipantProfilePage({
                   {data.screening.length === 0 ? (
                     <p className="text-secondary mb-0">No screener submissions yet.</p>
                   ) : (
-                    <div className="table-responsive">
-                      <table className="table align-middle mb-0">
-                        <thead>
-                          <tr>
-                            <th>Screener</th>
-                            <th>Submitted</th>
-                            <th>Result</th>
-                            <th>Reason</th>
-                            <th />
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {data.screening.map((item) => (
-                            <tr key={item.id}>
-                              <td>{item.screenerName}</td>
-                              <td>{formatDate(item.submittedAt)}</td>
-                              <td>
-                                <StatusBadge value={item.qualificationStatus} />
-                              </td>
-                              <td>{item.reason}</td>
-                              <td className="text-end">
-                                <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => setView(item)}>
-                                  View responses
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
+                    <RecordGrid
+                      columns={[
+                        { name: 'screener', title: 'Screener', minWidth: '10rem' },
+                        { name: 'submitted', title: 'Submitted', minWidth: '8rem' },
+                        { name: 'result', title: 'Result', kind: 'html', minWidth: '8rem' },
+                        { name: 'reason', title: 'Reason', minWidth: '12rem' },
+                        { name: 'view', title: ' ', kind: 'action', actionVariant: 'secondary', minWidth: '9rem' },
+                      ]}
+                      rows={data.screening.map((item) => ({
+                        id: item.id,
+                        screener: item.screenerName,
+                        submitted: formatDate(item.submittedAt),
+                        result: statusBadgeHtml(item.qualificationStatus),
+                        reason: item.reason || '—',
+                        view: 'View responses',
+                      }))}
+                      onAction={(_column, row) => {
+                        const item = data.screening.find((entry) => entry.id === row.id);
+                        if (item) setView(item);
+                      }}
+                    />
                   )}
                 </div>
               </section>

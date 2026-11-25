@@ -1,13 +1,14 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useRef, useState } from 'react';
 import { formRepository } from '../repositories/formRepository';
 import { researchRepository } from '../repositories/researchRepository';
+import { RecordGrid } from '../survey/RecordGrid';
+import { configureParticipantSearch } from '../survey/searchLayout';
 import { SurveyDialog } from '../survey/SurveyDialog';
 import { SurveyRenderer } from '../survey/SurveyRenderer';
 import { CreatorState } from '../types/creator';
 import { AuthUser } from '../types/auth';
 import { canDesign, canWrite } from '../ui/access';
-import { EmptyState, PageHeader, PageState, StatusBadge, useAsync, useDocumentTitle } from '../ui/components';
+import { EmptyState, PageHeader, PageState, statusBadgeHtml, useAsync, useDocumentTitle } from '../ui/components';
 
 const PREFILL = {
   firstName: 'Jordan',
@@ -37,8 +38,9 @@ export function ParticipantsPage({
 }) {
   useDocumentTitle('Participants');
   const [filter, setFilter] = useState({ surname: '', participantId: '', email: '' });
-  const [searchKey, setSearchKey] = useState(0);
   const [creating, setCreating] = useState(false);
+  const handlers = useRef({ openCreator, setFilter, designing: canDesign(user.role) });
+  handlers.current = { openCreator, setFilter, designing: canDesign(user.role) };
   const { data, error, loading, reload } = useAsync(() => researchRepository.participants(filter), [filter.surname, filter.participantId, filter.email]);
   const writing = canWrite(user.role);
   const designing = canDesign(user.role);
@@ -56,80 +58,53 @@ export function ParticipantsPage({
           ) : null
         }
       />
-      <section className="card app-card mb-4">
-        <div className="card-body">
-          <div className="d-flex justify-content-between align-items-center mb-3">
-            <h2 className="h5 mb-0">Search</h2>
-            {designing ? (
-              <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => openCreator({ kind: 'form', formId: 'participant-search' })}>
-                Customize search form
-              </button>
-            ) : null}
-          </div>
-          <SurveyRenderer
-            key={searchKey}
-            id="participant-search"
-            schema={formRepository.getForm('participant-search')}
-            hideTitle
-            actions={[
-              {
-                id: 'clear-search',
-                title: 'Clear',
-                action: () => {
-                  setFilter({ surname: '', participantId: '', email: '' });
-                  setSearchKey((value) => value + 1);
-                },
-              },
-            ]}
-            onSave={(record) =>
-              setFilter({
-                surname: String(record.surname ?? ''),
-                participantId: String(record.participantId ?? ''),
-                email: String(record.email ?? ''),
-              })
-            }
-          />
-        </div>
+      <section className="card app-card mb-3">
+        <SurveyRenderer
+          id="participant-search"
+          schema={formRepository.getForm('participant-search')}
+          showNavigation={false}
+          configure={(model) =>
+            configureParticipantSearch(model, {
+              canCustomize: handlers.current.designing,
+              onCustomize: () => handlers.current.openCreator({ kind: 'form', formId: 'participant-search' }),
+              onChange: (record) =>
+                handlers.current.setFilter({
+                  surname: String(record.surname ?? ''),
+                  participantId: String(record.participantId ?? ''),
+                  email: String(record.email ?? ''),
+                }),
+            })
+          }
+        />
       </section>
       <PageState loading={loading} error={error}>
         {data && data.length === 0 ? (
           <EmptyState>No participants match this search.</EmptyState>
         ) : (
-          <div className="table-responsive card app-card">
-            <table className="table table-hover align-middle mb-0">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Participant ID</th>
-                  <th>Status</th>
-                  <th className="d-none d-md-table-cell">Segment</th>
-                  <th className="d-none d-lg-table-cell">City</th>
-                  <th className="d-none d-lg-table-cell">Last study</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody>
-                {data?.map((person) => (
-                  <tr key={person.id}>
-                    <td>
-                      <Link to={`/participants/${person.id}`}>{person.fullName}</Link>
-                    </td>
-                    <td>{person.participantCode}</td>
-                    <td>
-                      <StatusBadge value={person.status} />
-                    </td>
-                    <td className="d-none d-md-table-cell">{person.segment || '—'}</td>
-                    <td className="d-none d-lg-table-cell">{person.city || '—'}</td>
-                    <td className="d-none d-lg-table-cell">{person.lastStudy || '—'}</td>
-                    <td className="text-end">
-                      <Link className="btn btn-sm btn-outline-primary" to={`/participants/${person.id}`}>
-                        Open
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="card app-card">
+            <RecordGrid
+              columns={[
+                { name: 'name', title: 'Name', kind: 'link', minWidth: '10rem' },
+                { name: 'code', title: 'Participant ID', minWidth: '8rem' },
+                { name: 'status', title: 'Status', kind: 'html', minWidth: '7rem' },
+                { name: 'segment', title: 'Segment', minWidth: '10rem' },
+                { name: 'city', title: 'City', minWidth: '7rem' },
+                { name: 'lastStudy', title: 'Last study', minWidth: '10rem' },
+                { name: 'open', title: ' ', kind: 'link', minWidth: '5rem' },
+              ]}
+              rows={(data ?? []).map((person) => ({
+                id: person.id,
+                name: person.fullName,
+                nameHref: `/participants/${person.id}`,
+                code: person.participantCode,
+                status: statusBadgeHtml(person.status),
+                segment: person.segment || '—',
+                city: person.city || '—',
+                lastStudy: person.lastStudy || '—',
+                open: 'Open',
+                openHref: `/participants/${person.id}`,
+              }))}
+            />
           </div>
         )}
       </PageState>

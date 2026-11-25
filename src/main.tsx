@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App';
 import { formRepository } from './repositories/formRepository';
+import './theme/demoTools';
 import { session } from './repositories/session';
 import 'bootswatch/dist/zephyr/bootstrap.min.css';
 import 'bootstrap-icons/font/bootstrap-icons.css';

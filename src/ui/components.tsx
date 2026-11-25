@@ -31,6 +31,25 @@ export function StatusBadge({ value }: { value: string }) {
   return <span className={`badge rounded-pill text-nowrap flex-shrink-0 ${TONES[value] ?? 'text-bg-secondary'}`}>{value}</span>;
 }
 
+export function escapeHtml(value: string) {
+  return value.replace(/[&<>"']/g, (char) => {
+    const map: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+    return map[char] ?? char;
+  });
+}
+
+export function statusBadgeHtml(value: string) {
+  if (!value) return '<span class="text-secondary">—</span>';
+  const tone = TONES[value] ?? 'text-bg-secondary';
+  return `<span class="badge rounded-pill text-nowrap ${tone}">${escapeHtml(value)}</span>`;
+}
+
+export function linkHtml(href: string, label: string, secondary?: string) {
+  const link = `<a href="${escapeHtml(href)}">${escapeHtml(label || '—')}</a>`;
+  if (!secondary) return link;
+  return `${link}<div class="small text-secondary">${escapeHtml(secondary)}</div>`;
+}
+
 export function PageHeader({
   title,
   description,
@@ -43,9 +62,9 @@ export function PageHeader({
   compact?: boolean;
 }) {
   return (
-    <div className={`d-flex flex-wrap justify-content-between align-items-start gap-3 ${compact ? 'mb-3' : 'mb-4'}`}>
+    <div className={`d-flex flex-wrap justify-content-between align-items-start gap-2 ${compact ? 'mb-2' : 'mb-3'}`}>
       <div>
-        <h1 className="page-title h3 mb-1">{title}</h1>
+        <h1 className="page-title h4 mb-1">{title}</h1>
         {description ? <p className="text-secondary mb-0">{description}</p> : null}
       </div>
       {actions ? <div className="d-flex flex-wrap gap-2">{actions}</div> : null}
@@ -67,7 +86,7 @@ export function PageState({ loading, error, children }: { loading: boolean; erro
 }
 
 export function EmptyState({ children }: { children: React.ReactNode }) {
-  return <div className="border rounded-3 bg-body-tertiary text-secondary p-4">{children}</div>;
+  return <div className="border rounded bg-body-tertiary text-secondary p-3">{children}</div>;
 }
 
 export function useDocumentTitle(title: string) {
@@ -121,9 +140,14 @@ export function Modal({
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose();
     };
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
     window.addEventListener('keydown', onKey);
     closeRef.current?.focus();
-    return () => window.removeEventListener('keydown', onKey);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', onKey);
+    };
   }, [onClose]);
 
   const dialogClass = size === 'fullscreen' ? 'modal-fullscreen' : `modal-${size} modal-dialog-centered survey-modal`;

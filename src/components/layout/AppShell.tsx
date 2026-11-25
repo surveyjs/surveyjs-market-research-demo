@@ -51,7 +51,7 @@ export function AppShell({ user, onLogout, children }: { user: AuthUser | null; 
               <span className="navbar-text ms-lg-auto badge text-bg-light border">Local demo</span>
             )}
             {user ? (
-              <div className="d-flex align-items-center gap-3 ms-lg-3">
+              <div className="d-flex align-items-center gap-2 ms-lg-2">
                 <span className="navbar-text small">
                   <strong className="text-body">{user.fullName}</strong>
                   <span className="text-secondary"> · {roleLabel(user.role)}</span>
@@ -65,9 +65,9 @@ export function AppShell({ user, onLogout, children }: { user: AuthUser | null; 
           </div>
         </div>
       </nav>
-      <main className="container-xl py-4">
+      <main className="container-xl py-3">
         {children}
-        <footer className="text-secondary small text-end mt-4">Acme Research demo · Changes are saved in the local database</footer>
+        <footer className="text-secondary small text-end mt-3">Acme Research demo · Changes are saved in the local database</footer>
       </main>
     </>
   );

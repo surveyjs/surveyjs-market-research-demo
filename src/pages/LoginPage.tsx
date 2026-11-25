@@ -14,7 +14,7 @@ export function LoginPage({ onLogin }: { onLogin: (session: Session, remember: b
       <div className="col-sm-10 col-lg-6 col-xl-5">
         <PageHeader
           title="Sign in"
-          description="Choose a demo account. Every password is demo1234. Maya Collins is the administrator."
+          description="Choose a demo account to open the research workspace."
         />
         <section className="card app-card">
           <div className="card-body">
@@ -28,7 +28,7 @@ export function LoginPage({ onLogin }: { onLogin: (session: Session, remember: b
                 authRepository
                   .login(String(data.username ?? ''), String(data.password ?? ''))
                   .then((user) => onLogin(user, Boolean(data.remember_me)))
-                  .catch(() => model.getQuestionByName('password')?.addError(new SurveyError('Invalid username or password.')))
+                  .catch(() => model.getQuestionByName('password')?.addError(new SurveyError('Invalid username or password. Please try again.')))
                   .finally(() => {
                     pending.current = false;
                   });

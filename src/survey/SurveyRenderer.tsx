@@ -1,6 +1,7 @@
-import React, { useMemo, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { IAction, Model } from 'survey-core';
 import { Survey } from 'survey-react-ui';
+import { demoTools } from '../theme/demoTools';
 
 export type SurveyAction = Partial<IAction> & { id: string };
 
@@ -85,6 +86,10 @@ export function SurveyRenderer({
     // The model is created once for this schema and mode. Callers pass a key to rebuild it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, schema, readOnly, hideTitle, showNavigation, completeText]);
+
+  useEffect(() => {
+    if (hostRef.current) demoTools.mark(hostRef.current);
+  }, []);
 
   return (
     <div id={id} ref={hostRef} className="survey-host">

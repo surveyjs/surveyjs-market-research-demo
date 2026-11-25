@@ -1,9 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { SurveyCreator, SurveyCreatorComponent } from 'survey-creator-react';
 import 'survey-creator-core/survey-creator-core.min.css';
 import { errorMessage } from '../repositories/api';
 import { Modal } from '../ui/components';
-import { applyResearchCreatorTheme } from './creatorTheme';
+import { demoTools } from '../theme/demoTools';
+import { applyResearchCreatorTheme, clearResearchCreator } from './creatorTheme';
 
 export function CreatorDialog({
   title,
@@ -33,6 +34,12 @@ export function CreatorDialog({
     applyResearchCreatorTheme(instance);
     return instance;
   }, [schema]);
+
+  useEffect(() => {
+    const host = document.querySelector<HTMLElement>('.creator-host');
+    if (host) demoTools.mark(host, 'SurveyJS Creator');
+    return () => clearResearchCreator();
+  }, [creator]);
 
   return (
     <Modal title={title} size="fullscreen" onClose={onClose}>

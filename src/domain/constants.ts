@@ -20,4 +20,4 @@ export const RULE_OPERATORS = ['eq', 'neq', 'in', 'nin', 'empty', 'notEmpty'] as
 export const QUALIFICATION_STATUSES = ['Qualified', 'Disqualified', 'Pending review'] as const;
 
 export const DEMO_PASSWORD = 'demo1234';
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 3;
