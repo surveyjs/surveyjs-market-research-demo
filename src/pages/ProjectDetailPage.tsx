@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import React, { useEffect, useRef, useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { SendScreenerDialog } from '../components/screeners/SendScreenerDialog';
 import { PROJECT_STATUSES } from '../domain/constants';
 import { fieldworkLabel, formatDate, recruitmentLabel } from '../domain/format';
@@ -11,7 +11,7 @@ import { SurveyDialog } from '../survey/SurveyDialog';
 import { CreatorState } from '../types/creator';
 import { AuthUser } from '../types/auth';
 import { canDesign, canWrite } from '../ui/access';
-import { PageHeader, PageState, StatusBadge, statusBadgeHtml, useAsync, useDocumentTitle } from '../ui/components';
+import { ConfirmDialog, PageHeader, PageState, StatusBadge, useAsync, useDocumentTitle } from '../ui/components';
 
 export function ProjectDetailPage({
   user,
@@ -23,12 +23,17 @@ export function ProjectDetailPage({
   showToast: (message: string) => void;
 }) {
   const { projectId = '' } = useParams();
+  const navigate = useNavigate();
   const { data, error, loading, reload } = useAsync(() => researchRepository.project(projectId), [projectId]);
   const [editing, setEditing] = useState(false);
+  const [confirm, setConfirm] = useState<'archive' | 'restore' | 'delete' | null>(null);
+  const [confirmError, setConfirmError] = useState('');
+  const [busy, setBusy] = useState(false);
   const [survey, setSurvey] = useState(false);
   const [screener, setScreener] = useState(false);
   const [participation, setParticipation] = useState(false);
   const [sending, setSending] = useState(false);
+  const [tab, setTab] = useState<'overview' | 'studies' | 'participants' | 'screeners'>('overview');
   const writing = canWrite(user.role);
   const designing = canDesign(user.role);
   const project = data?.project;
@@ -64,37 +69,80 @@ export function ProjectDetailPage({
             actions={
               writing ? (
                 <>
-                  <button type="button" className="btn btn-sm btn-outline-primary" onClick={() => setEditing(true)}>
+                  {project.archived ? null : (
+                    <label className="d-flex align-items-center gap-2 small mb-0">
+                      <span className="text-secondary">Status</span>
+                      <select className="form-select form-select-sm w-auto" value={project.status} onChange={(event) => changeStatus(event.target.value)} aria-label="Project status">
+                        {PROJECT_STATUSES.map((status) => (
+                          <option key={status}>{status}</option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
+                  <button type="button" className="btn btn-sm btn-primary" onClick={() => setEditing(true)}>
                     Edit project
                   </button>
-                  <button type="button" className="btn btn-sm btn-outline-primary" onClick={() => setParticipation(true)}>
-                    Add participation
-                  </button>
-                  <button type="button" className="btn btn-sm btn-primary" onClick={() => setSending(true)}>
-                    Send screener
-                  </button>
+                  <ProjectActions
+                    archived={project.archived}
+                    onDuplicate={() => {
+                      setBusy(true);
+                      researchRepository
+                        .duplicateProject(project.id)
+                        .then((copy) => {
+                          showToast(`${copy.project.name} was created as a draft.`);
+                          navigate(`/projects/${copy.project.id}`);
+                        })
+                        .catch((err) => showToast(errorMessage(err)))
+                        .finally(() => setBusy(false));
+                    }}
+                    onArchive={() => {
+                      setConfirmError('');
+                      setConfirm('archive');
+                    }}
+                    onRestore={() => {
+                      setConfirmError('');
+                      setConfirm('restore');
+                    }}
+                    onDelete={() => {
+                      setConfirmError('');
+                      setConfirm('delete');
+                    }}
+                  />
                 </>
               ) : null
             }
           />
+          <div className="d-flex flex-wrap align-items-center gap-2 mb-3">
+            {project.archived ? <StatusBadge value="Archived" /> : null}
+            <StatusBadge value={project.status} />
+            <span className="text-secondary small">{fieldworkLabel(project)}</span>
+            <span className="text-secondary small">
+              {project.recruited} / {project.recruitmentTarget} recruited
+            </span>
+          </div>
+          <ul className="nav nav-tabs mb-3" role="tablist">
+            {(
+              [
+                ['overview', 'Overview'],
+                ['studies', 'Studies & Surveys'],
+                ['participants', 'Participants'],
+                ['screeners', 'Screeners'],
+              ] as const
+            ).map(([id, label]) => (
+              <li className="nav-item" key={id}>
+                <button type="button" className={`nav-link ${tab === id ? 'active' : ''}`} aria-selected={tab === id} onClick={() => setTab(id)}>
+                  {label}
+                </button>
+              </li>
+            ))}
+          </ul>
+          {tab === 'overview' ? (
           <div className="row g-3">
             <div className="col-lg-7">
               <section className="card app-card h-100">
                 <div className="card-body">
                   <div className="d-flex flex-wrap justify-content-between gap-2 mb-3">
                     <h2 className="h5 mb-0">Overview</h2>
-                    {writing ? (
-                      <label className="d-flex align-items-center gap-2 small mb-0">
-                        Status
-                        <select className="form-select form-select-sm" value={project.status} onChange={(event) => changeStatus(event.target.value)}>
-                          {PROJECT_STATUSES.map((status) => (
-                            <option key={status}>{status}</option>
-                          ))}
-                        </select>
-                      </label>
-                    ) : (
-                      <StatusBadge value={project.status} />
-                    )}
                   </div>
                   <p>{project.objective}</p>
                   {project.description ? <p className="text-secondary">{project.description}</p> : null}
@@ -131,7 +179,10 @@ export function ProjectDetailPage({
                 </div>
               </section>
             </div>
-            <div className="col-lg-6">
+          </div>
+          ) : null}
+          {tab === 'studies' ? (
+            <div className="col-lg-8">
               <section className="card app-card h-100">
                 <div className="card-body">
                   <div className="d-flex justify-content-between mb-3">
@@ -162,16 +213,25 @@ export function ProjectDetailPage({
                 </div>
               </section>
             </div>
-            <div className="col-lg-6">
+          ) : null}
+          {tab === 'screeners' ? (
+            <div className="col-lg-8">
               <section className="card app-card h-100">
                 <div className="card-body">
-                  <div className="d-flex justify-content-between mb-3">
+                  <div className="d-flex flex-wrap justify-content-between gap-2 mb-3">
                     <h2 className="h5 mb-0">Screeners</h2>
-                    {designing ? (
-                      <button type="button" className="btn btn-sm btn-outline-primary" onClick={() => setScreener(true)}>
-                        Add screener
-                      </button>
-                    ) : null}
+                    <div className="d-flex flex-wrap gap-2">
+                      {writing ? (
+                        <button type="button" className="btn btn-sm btn-outline-primary" onClick={() => setSending(true)}>
+                          Send screener
+                        </button>
+                      ) : null}
+                      {designing ? (
+                        <button type="button" className="btn btn-sm btn-outline-primary" onClick={() => setScreener(true)}>
+                          Add screener
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
                   {data.screeners.length === 0 ? <p className="text-secondary mb-0">No screeners linked to this project.</p> : null}
                   <ul className="list-group">
@@ -188,10 +248,19 @@ export function ProjectDetailPage({
                 </div>
               </section>
             </div>
+          ) : null}
+          {tab === 'participants' ? (
             <div className="col-12">
               <section className="card app-card">
                 <div className="card-body">
-                  <h2 className="h5">Participants</h2>
+                  <div className="d-flex flex-wrap justify-content-between gap-2 mb-3">
+                    <h2 className="h5 mb-0">Participants</h2>
+                    {writing ? (
+                      <button type="button" className="btn btn-sm btn-outline-primary" onClick={() => setParticipation(true)}>
+                        Add participation
+                      </button>
+                    ) : null}
+                  </div>
                   {data.participants.length === 0 ? (
                     <p className="text-secondary">No participants are assigned yet.</p>
                   ) : (
@@ -200,7 +269,7 @@ export function ProjectDetailPage({
                         { name: 'name', title: 'Name', kind: 'link', minWidth: '10rem' },
                         { name: 'code', title: 'ID', minWidth: '7rem' },
                         { name: 'city', title: 'City', minWidth: '7rem' },
-                        { name: 'status', title: 'Status', kind: 'html', minWidth: '7rem' },
+                        { name: 'status', title: 'Status', minWidth: '8rem' },
                       ]}
                       rows={data.participants.map((person) => ({
                         id: person.id,
@@ -208,7 +277,7 @@ export function ProjectDetailPage({
                         nameHref: `/participants/${person.id}`,
                         code: person.participantCode,
                         city: person.city || '—',
-                        status: statusBadgeHtml(person.status),
+                        status: person.status,
                       }))}
                     />
                   )}
@@ -221,7 +290,7 @@ export function ProjectDetailPage({
                         { name: 'name', title: 'Participant', kind: 'link', minWidth: '10rem' },
                         { name: 'date', title: 'Date', minWidth: '7rem' },
                         { name: 'method', title: 'Method', minWidth: '8rem' },
-                        { name: 'status', title: 'Status', kind: 'html', minWidth: '7rem' },
+                        { name: 'status', title: 'Status', minWidth: '8rem' },
                       ]}
                       rows={data.participations.map((item) => ({
                         id: item.id,
@@ -229,14 +298,57 @@ export function ProjectDetailPage({
                         nameHref: `/participants/${item.participantId}`,
                         date: formatDate(item.participationDate),
                         method: item.method,
-                        status: statusBadgeHtml(item.status),
+                        status: item.status,
                       }))}
                     />
                   )}
                 </div>
               </section>
             </div>
-          </div>
+          ) : null}
+          {confirm ? (
+            <ConfirmDialog
+              title={confirm === 'delete' ? 'Delete project' : confirm === 'archive' ? 'Archive project' : 'Restore project'}
+              body={
+                confirm === 'delete'
+                  ? `Delete ${project.name}? The project record is removed. Linked surveys and screeners stay in the library.`
+                  : confirm === 'archive'
+                    ? `Archive ${project.name}? It leaves the active list. Restore brings it back with the ${project.status} status.`
+                    : `Restore ${project.name}? It returns to the ${project.status} list.`
+              }
+              confirmLabel={confirm === 'delete' ? 'Delete' : confirm === 'archive' ? 'Archive' : 'Restore'}
+              tone={confirm === 'delete' ? 'danger' : 'primary'}
+              busy={busy}
+              error={confirmError}
+              onClose={() => {
+                if (!busy) setConfirm(null);
+              }}
+              onConfirm={() => {
+                const action = confirm;
+                setBusy(true);
+                setConfirmError('');
+                const request =
+                  action === 'delete'
+                    ? researchRepository.deleteProject(project.id)
+                    : action === 'archive'
+                      ? researchRepository.archiveProject(project.id)
+                      : researchRepository.restoreProject(project.id);
+                request
+                  .then(() => {
+                    setConfirm(null);
+                    if (action === 'delete') {
+                      showToast(`${project.name} was deleted.`);
+                      navigate('/projects');
+                      return;
+                    }
+                    showToast(action === 'archive' ? `${project.name} was archived.` : `${project.name} was restored.`);
+                    reload();
+                  })
+                  .catch((err) => setConfirmError(errorMessage(err)))
+                  .finally(() => setBusy(false));
+              }}
+            />
+          ) : null}
           {editing ? (
             <SurveyDialog
               title="Edit project"
@@ -311,5 +423,68 @@ export function ProjectDetailPage({
         </>
       ) : null}
     </PageState>
+  );
+}
+
+function ProjectActions({
+  archived,
+  onDuplicate,
+  onArchive,
+  onRestore,
+  onDelete,
+}: {
+  archived: boolean;
+  onDuplicate: () => void;
+  onArchive: () => void;
+  onRestore: () => void;
+  onDelete: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onPointer = (event: MouseEvent) => {
+      if (!ref.current?.contains(event.target as Node)) setOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', onPointer);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onPointer);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  const choose = (action: () => void) => {
+    setOpen(false);
+    action();
+  };
+
+  return (
+    <div className="dropdown" ref={ref}>
+      <button type="button" className="btn btn-sm btn-outline-secondary dropdown-toggle" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
+        Actions
+      </button>
+      <ul className={`dropdown-menu dropdown-menu-end ${open ? 'show' : ''}`}>
+        <li>
+          <button type="button" className="dropdown-item" onClick={() => choose(onDuplicate)}>
+            Duplicate
+          </button>
+        </li>
+        <li>
+          <button type="button" className="dropdown-item" onClick={() => choose(archived ? onRestore : onArchive)}>
+            {archived ? 'Restore' : 'Archive'}
+          </button>
+        </li>
+        <li><hr className="dropdown-divider" /></li>
+        <li>
+          <button type="button" className="dropdown-item text-danger" onClick={() => choose(onDelete)}>
+            Delete
+          </button>
+        </li>
+      </ul>
+    </div>
   );
 }

@@ -1,24 +1,43 @@
 import { ActionContainer, Model } from 'survey-core';
 
-const SEARCH_FIELDS = ['surname', 'participantId', 'email'] as const;
+export const PARTICIPANT_SEARCH_FIELDS = ['surname', 'participantId', 'email'] as const;
+
+export type ParticipantSearchField = (typeof PARTICIPANT_SEARCH_FIELDS)[number];
+export type ParticipantSearchValues = Record<ParticipantSearchField, string>;
+
+export const EMPTY_PARTICIPANT_SEARCH: ParticipantSearchValues = {
+  surname: '',
+  participantId: '',
+  email: '',
+};
+
+const PREFILL: ParticipantSearchValues = { ...EMPTY_PARTICIPANT_SEARCH, surname: 'Thompson', participantId: 'P-10481' };
+
+export function participantSearchValues(data: Record<string, unknown>): ParticipantSearchValues {
+  const next = { ...EMPTY_PARTICIPANT_SEARCH };
+  PARTICIPANT_SEARCH_FIELDS.forEach((name) => {
+    const value = data[name];
+    next[name] = typeof value === 'string' ? value : '';
+  });
+  return next;
+}
 
 export function configureParticipantSearch(
   model: Model,
   options: {
     canCustomize: boolean;
     onCustomize: () => void;
-    onChange: (data: Record<string, unknown>) => void;
+    onChange: (data: ParticipantSearchValues) => void;
   },
 ) {
   model.headerView = 'basic';
   model.showCompleteButton = false;
   model.showNavigationButtons = false;
   model.getAllQuestions().forEach((question) => {
-    if (question.name !== 'surname') question.startWithNewLine = false;
     question.minWidth = '12rem';
   });
   model.onValueChanged.add((sender) => {
-    options.onChange(structuredClone(sender.data));
+    options.onChange(participantSearchValues(sender.data));
   });
 
   if (options.canCustomize) {
@@ -48,14 +67,14 @@ export function configureParticipantSearch(
     title: 'Prefill Demo Data',
     showTitle: true,
     innerCss: 'btn btn-sm btn-outline-secondary',
-    action: () => fill(model, { surname: 'Thompson', participantId: 'P-10481', email: '' }),
+    action: () => fill(model, PREFILL),
   });
   footer.addAction({
     id: 'clear-search',
-    title: 'Clear',
+    title: 'Clear Filters',
     showTitle: true,
     innerCss: 'btn btn-sm btn-outline-secondary',
-    action: () => fill(model, { surname: '', participantId: '', email: '' }),
+    action: () => fill(model, EMPTY_PARTICIPANT_SEARCH),
   });
   model.addLayoutElement({
     id: 'search-footer-actions',
@@ -65,8 +84,11 @@ export function configureParticipantSearch(
   });
 }
 
-function fill(model: Model, data: Record<(typeof SEARCH_FIELDS)[number], string>) {
+function fill(model: Model, data: ParticipantSearchValues) {
   const active = document.activeElement;
   if (active instanceof HTMLElement) active.blur();
-  SEARCH_FIELDS.forEach((name) => model.setValue(name, data[name]));
+  PARTICIPANT_SEARCH_FIELDS.forEach((name) => {
+    if (data[name]) model.setValue(name, data[name]);
+    else model.clearValue(name);
+  });
 }

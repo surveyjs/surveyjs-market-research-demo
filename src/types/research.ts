@@ -13,6 +13,7 @@ export interface Project {
   recruitmentTarget: number;
   recruited: number;
   status: string;
+  archived: boolean;
   allowRepeat: boolean;
   createdAt: string;
   updatedAt: string;
@@ -38,7 +39,12 @@ export interface ParticipantSummary {
   status: string;
   segment: string;
   city: string;
+  recruitmentSource: string;
   lastStudy: string;
+  projectCount: number;
+  studyCount: number;
+  screenerCount: number;
+  createdAt: string;
 }
 
 export interface Participant extends ParticipantSummary {
@@ -139,6 +145,8 @@ export interface ScreenerRecord {
   status: string;
   questionCount: number;
   responseCount: number;
+  eligibleCount: number;
+  disqualifiedCount: number;
   qualification: QualificationConfig;
   createdAt: string;
   updatedAt: string;

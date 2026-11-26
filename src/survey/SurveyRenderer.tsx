@@ -17,6 +17,7 @@ export function SurveyRenderer({
   showNavigation = true,
   completeText,
   configure,
+  onModel,
 }: {
   id: string;
   schema: object;
@@ -29,10 +30,11 @@ export function SurveyRenderer({
   showNavigation?: boolean;
   completeText?: string;
   configure?: (model: Model) => void;
+  onModel?: (model: Model) => void;
 }) {
   const hostRef = useRef<HTMLDivElement>(null);
-  const handlers = useRef({ onSave, actions });
-  handlers.current = { onSave, actions };
+  const handlers = useRef({ onSave, actions, onModel });
+  handlers.current = { onSave, actions, onModel };
 
   const model = useMemo(() => {
     const next = new Model({
@@ -89,7 +91,8 @@ export function SurveyRenderer({
 
   useEffect(() => {
     if (hostRef.current) demoTools.mark(hostRef.current);
-  }, []);
+    handlers.current.onModel?.(model);
+  }, [model]);
 
   return (
     <div id={id} ref={hostRef} className="survey-host">

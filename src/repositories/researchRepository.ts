@@ -30,9 +30,25 @@ export const researchRepository = {
     api<ProjectDetail>(`/projects/${id}`, { method: 'PUT', body: JSON.stringify(record) }),
   setProjectStatus: (id: string, status: string) =>
     api<ProjectDetail>(`/projects/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+  duplicateProject: (id: string) => api<ProjectDetail>(`/projects/${id}/duplicate`, { method: 'POST' }),
+  archiveProject: (id: string) => api<ProjectDetail>(`/projects/${id}/archive`, { method: 'POST' }),
+  restoreProject: (id: string) => api<ProjectDetail>(`/projects/${id}/restore`, { method: 'POST' }),
+  deleteProject: (id: string) => api<void>(`/projects/${id}`, { method: 'DELETE' }),
 
-  participants: (filter: { surname?: string; participantId?: string; email?: string }) =>
-    api<ParticipantSummary[]>(`/participants${query(filter)}`),
+  participants: (filter: {
+    surname?: string;
+    participantId?: string;
+    email?: string;
+    status?: string;
+    recruitmentSource?: string;
+    city?: string;
+    ageGroup?: string;
+    segment?: string;
+    study?: string;
+    screeningStatus?: string;
+  }) => api<ParticipantSummary[]>(`/participants${query(filter)}`),
+  setParticipantStatus: (id: string, status: string) =>
+    api<ParticipantProfile>(`/participants/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
   participantChoices: () => api<Choice[]>('/participants/choices'),
   participant: (id: string) => api<ParticipantProfile>(`/participants/${id}`),
   createParticipant: (record: Record<string, unknown>) =>
@@ -55,6 +71,8 @@ export const researchRepository = {
     api<SurveyRecord>(`/surveys/${id}/schema`, { method: 'PUT', body: JSON.stringify({ schema }) }),
   setSurveyStatus: (id: string, status: string) =>
     api<SurveyRecord>(`/surveys/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+  duplicateSurvey: (id: string) => api<SurveyRecord>(`/surveys/${id}/duplicate`, { method: 'POST' }),
+  deleteSurvey: (id: string) => api<void>(`/surveys/${id}`, { method: 'DELETE' }),
   surveyResponses: (id: string) => api<SurveyResponseRecord[]>(`/surveys/${id}/responses`),
   addSurveyResponse: (id: string, response: Record<string, unknown>, isTestResponse = true) =>
     api<SurveyResponseRecord>(`/surveys/${id}/responses`, {
@@ -74,6 +92,8 @@ export const researchRepository = {
     api<ScreenerRecord>(`/screeners/${id}/rules`, { method: 'PUT', body: JSON.stringify(rules) }),
   setScreenerStatus: (id: string, status: string) =>
     api<ScreenerRecord>(`/screeners/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) }),
+  duplicateScreener: (id: string) => api<ScreenerRecord>(`/screeners/${id}/duplicate`, { method: 'POST' }),
+  deleteScreener: (id: string) => api<void>(`/screeners/${id}`, { method: 'DELETE' }),
   submitScreener: (participantId: string, screenerId: string, response: Record<string, unknown>) =>
     api<ScreeningRecord>('/screener-responses', {
       method: 'POST',

@@ -29,8 +29,67 @@ body {
   font-weight: 500;
 }
 
+.project-status-nav .nav-link {
+  display: inline-flex;
+  align-items: center;
+}
+
+.project-status-nav .nav-link.active .badge {
+  color: var(--bs-primary);
+}
+
 .app-card {
   box-shadow: var(--bs-box-shadow-sm);
+}
+
+.side-panel-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1040;
+  background: rgba(var(--bs-body-color-rgb), 0.35);
+}
+
+.side-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  z-index: 1045;
+  display: flex;
+  flex-direction: column;
+  width: min(42rem, 100vw);
+  height: 100%;
+  background: var(--bs-body-bg);
+  box-shadow: var(--bs-box-shadow-lg);
+}
+
+.side-panel-header,
+.side-panel-body {
+  padding: 1rem 1.25rem;
+}
+
+.side-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-bottom: 1px solid var(--bs-border-color);
+}
+
+.side-panel-body {
+  min-height: 0;
+  overflow: auto;
+}
+
+.person-avatar {
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  background: rgba(var(--bs-primary-rgb), 0.12);
+  color: var(--bs-primary);
+  font-weight: 600;
+  flex: 0 0 auto;
 }
 
 .survey-host .sd-root-modern,
@@ -129,15 +188,33 @@ body {
 
 [data-survey-component] {
   position: relative;
+  isolation: isolate;
 }
 
 :root[data-survey-outlines='true'] [data-survey-component] {
-  outline: 2px dashed var(--bs-primary);
-  outline-offset: 4px;
-  box-shadow: 0 0 0 6px rgba(var(--bs-primary-rgb), 0.15);
+  --survey-glow: rgba(var(--bs-primary-rgb), 0.18);
+  box-shadow: 0 0 0 4px var(--survey-glow), 0 0 24px var(--survey-glow);
+  animation: survey-component-glow 3.2s ease-in-out infinite;
+}
+
+:root[data-survey-outlines='true'] [data-survey-component]::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  border: 2px dashed var(--bs-primary);
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+@keyframes survey-component-glow {
+  50% {
+    box-shadow: 0 0 0 8px rgba(var(--bs-primary-rgb), 0.05), 0 0 30px var(--survey-glow);
+  }
 }
 
 #participant-search {
+  container-type: inline-size;
   --search-inset: 1rem;
 }
 
@@ -156,6 +233,8 @@ body {
   --sjs2-layout-component-survey-footer-padding-bottom: 0;
   --sjs2-layout-component-question-header-padding-bottom: 0;
   --sjs2-layout-component-question-box-gap-vertical: 0.5rem;
+  --sjs2-typography-font-size-component-survey-header-title: 1.25rem;
+  --sjs2-typography-line-height-component-survey-header-title: 2rem;
 }
 
 #participant-search .sd-container-modern {
@@ -167,6 +246,14 @@ body {
 #participant-search .sd-container-modern > .search-footer-actions {
   grid-column: 1 / -1;
   min-width: 0;
+}
+
+#participant-search .sd-container-modern > .sv-components-row {
+  border-top: 1px solid var(--bs-border-color);
+}
+
+#participant-search .sd-header__text {
+  gap: 0.5rem;
 }
 
 #participant-search .sd-container-modern > .sd-container-modern__title {
@@ -185,49 +272,67 @@ body {
 }
 
 #participant-search .search-header-actions {
+  align-self: center;
+  flex-direction: column;
+  align-items: stretch;
   justify-content: flex-end;
   padding-bottom: var(--search-inset);
+  overflow: visible;
 }
 
 #participant-search .search-footer-actions {
   grid-column: 1 / -1;
   flex-direction: column;
   align-items: stretch;
+  padding-top: 1.5rem;
   padding-bottom: var(--search-inset);
 }
 
 #participant-search .search-header-actions .sd-action,
 #participant-search .search-footer-actions .sd-action {
-  width: 100%;
+  box-sizing: border-box;
+  width: 100% !important;
+}
+
+#participant-search .sd-body,
+#participant-search .sd-page {
+  padding: 0;
 }
 
 #participant-search .sd-body {
   padding-inline: var(--search-inset);
+  padding-top: 0.5rem;
 }
 
-#participant-search .sd-row {
-  align-items: flex-end;
+#participant-search .sd-row.sd-page__row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--search-inset);
-}
-
-/* SurveyJS sizes each field at 33% plus the row gap, so the third field wraps off the card. */
-#participant-search .sd-row > .sd-element-wrapper {
-  flex: 1 1 14rem !important;
-  width: auto !important;
-  max-width: 100% !important;
-  min-width: 0 !important;
+  align-items: end;
+  width: 100%;
   margin: 0;
-  padding: 0;
 }
 
-@media (min-width: 768px) {
+#participant-search .sd-element-wrapper,
+#participant-search .sd-row__question {
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  flex: none !important;
+  margin: 0;
+  padding: 0 !important;
+}
+
+@media (min-width: 600px) {
   #participant-search .sd-container-modern {
     grid-template-columns: minmax(0, 1fr) auto;
   }
 
   #participant-search .search-header-actions {
     width: max-content;
-    justify-content: flex-end;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
     padding-block: 0.5rem;
   }
 
@@ -238,7 +343,23 @@ body {
 
   #participant-search .search-header-actions .sd-action,
   #participant-search .search-footer-actions .sd-action {
-    width: auto;
+    width: auto !important;
+  }
+}
+
+@media (min-width: 900px) {
+  #participant-search {
+    --search-inset: 1.5rem;
+  }
+
+  #participant-search .search-header-actions {
+    justify-content: flex-end;
+  }
+}
+
+@container (width < 40rem) {
+  #participant-search .sd-row.sd-page__row {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -274,14 +395,20 @@ body {
   padding: 0.5rem 0.75rem 0.75rem;
 }
 
+@media (min-width: 600px) {
+  :root[data-survey-outlines='true'] #participant-search .search-header-actions {
+    margin-inline-end: 12.5rem;
+  }
+}
+
 :root[data-survey-outlines='true'] [data-survey-component]::after {
   content: attr(data-survey-component);
   position: absolute;
   top: 0;
   right: 0;
-  z-index: 5;
-  padding: 0.125rem 0.5rem;
-  border-radius: 0 var(--bs-border-radius) 0 var(--bs-border-radius);
+  z-index: 7;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0 var(--bs-border-radius) 0 0.5rem;
   background: var(--bs-primary);
   color: var(--bs-white);
   font-size: 0.75rem;

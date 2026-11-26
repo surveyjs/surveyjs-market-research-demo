@@ -19,6 +19,11 @@ function param(req: Request): string {
   return Array.isArray(value) ? value[0] : value;
 }
 
+function queryText(req: Request, name: string): string {
+  const value = req.query[name];
+  return typeof value === 'string' ? value : '';
+}
+
 export function createApp(db: ResearchDb) {
   const app = express();
   app.use(express.json({ limit: '4mb' }));
@@ -139,6 +144,39 @@ export function createApp(db: ResearchDb) {
     }
   });
 
+  app.post('/api/projects/:id/duplicate', authenticate, write, (req, res) => {
+    try {
+      res.status(201).json(db.duplicateProject(param(req)));
+    } catch (error) {
+      fail(res, error);
+    }
+  });
+
+  app.post('/api/projects/:id/archive', authenticate, write, (req, res) => {
+    try {
+      res.json(db.archiveProject(param(req)));
+    } catch (error) {
+      fail(res, error);
+    }
+  });
+
+  app.post('/api/projects/:id/restore', authenticate, write, (req, res) => {
+    try {
+      res.json(db.restoreProject(param(req)));
+    } catch (error) {
+      fail(res, error);
+    }
+  });
+
+  app.delete('/api/projects/:id', authenticate, write, (req, res) => {
+    try {
+      db.deleteProject(param(req));
+      res.status(204).end();
+    } catch (error) {
+      fail(res, error);
+    }
+  });
+
   app.get('/api/participants/choices', authenticate, (_req, res) => {
     res.json(db.participantChoices());
   });
@@ -147,9 +185,16 @@ export function createApp(db: ResearchDb) {
     try {
       res.json(
         db.searchParticipants({
-          surname: typeof req.query.surname === 'string' ? req.query.surname : '',
-          participantId: typeof req.query.participantId === 'string' ? req.query.participantId : '',
-          email: typeof req.query.email === 'string' ? req.query.email : '',
+          surname: queryText(req, 'surname'),
+          participantId: queryText(req, 'participantId'),
+          email: queryText(req, 'email'),
+          status: queryText(req, 'status'),
+          recruitmentSource: queryText(req, 'recruitmentSource'),
+          city: queryText(req, 'city'),
+          ageGroup: queryText(req, 'ageGroup'),
+          segment: queryText(req, 'segment'),
+          study: queryText(req, 'study'),
+          screeningStatus: queryText(req, 'screeningStatus'),
         }),
       );
     } catch (error) {
@@ -168,6 +213,14 @@ export function createApp(db: ResearchDb) {
   app.post('/api/participants', authenticate, write, (req, res) => {
     try {
       res.status(201).json(db.createParticipant(req.body));
+    } catch (error) {
+      fail(res, error);
+    }
+  });
+
+  app.patch('/api/participants/:id/status', authenticate, write, (req, res) => {
+    try {
+      res.json(db.setParticipantStatus(param(req), typeof req.body?.status === 'string' ? req.body.status : ''));
     } catch (error) {
       fail(res, error);
     }
@@ -258,6 +311,23 @@ export function createApp(db: ResearchDb) {
     }
   });
 
+  app.post('/api/surveys/:id/duplicate', authenticate, design, (req, res) => {
+    try {
+      res.status(201).json(db.duplicateSurvey(param(req), (req as Authed).user));
+    } catch (error) {
+      fail(res, error);
+    }
+  });
+
+  app.delete('/api/surveys/:id', authenticate, design, (req, res) => {
+    try {
+      db.deleteSurvey(param(req));
+      res.status(204).end();
+    } catch (error) {
+      fail(res, error);
+    }
+  });
+
   app.get('/api/surveys/:id/responses', authenticate, (req, res) => {
     try {
       res.json(db.surveyResponses(param(req)));
@@ -325,6 +395,23 @@ export function createApp(db: ResearchDb) {
   app.patch('/api/screeners/:id/status', authenticate, design, (req, res) => {
     try {
       res.json(db.setScreenerStatus(param(req), typeof req.body?.status === 'string' ? req.body.status : ''));
+    } catch (error) {
+      fail(res, error);
+    }
+  });
+
+  app.post('/api/screeners/:id/duplicate', authenticate, design, (req, res) => {
+    try {
+      res.status(201).json(db.duplicateScreener(param(req), (req as Authed).user));
+    } catch (error) {
+      fail(res, error);
+    }
+  });
+
+  app.delete('/api/screeners/:id', authenticate, design, (req, res) => {
+    try {
+      db.deleteScreener(param(req));
+      res.status(204).end();
     } catch (error) {
       fail(res, error);
     }

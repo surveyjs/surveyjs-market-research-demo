@@ -1,18 +1,21 @@
-import React, { useState } from 'react';
-import { previewScreenerResult, SendScreenerDialog } from '../components/screeners/SendScreenerDialog';
-import { RULE_OPERATORS } from '../domain/constants';
+import React, { useMemo, useState } from 'react';
+import { RULE_OPERATORS, SCREENER_STATUSES } from '../domain/constants';
 import { formatDate } from '../domain/format';
 import { questionNames } from '../domain/questions';
 import { QualificationRule } from '../domain/qualify';
 import { errorMessage } from '../repositories/api';
 import { formRepository } from '../repositories/formRepository';
 import { researchRepository } from '../repositories/researchRepository';
+import { RecordGrid } from '../survey/RecordGrid';
 import { SurveyDialog } from '../survey/SurveyDialog';
 import { CreatorState } from '../types/creator';
 import { AuthUser } from '../types/auth';
 import { ScreenerRecord } from '../types/research';
-import { canDesign, canWrite } from '../ui/access';
-import { Modal, PageHeader, PageState, StatusBadge, useAsync, useDocumentTitle } from '../ui/components';
+import { canDesign } from '../ui/access';
+import { EmptyState, Modal, PageHeader, PageState, useAsync, useDocumentTitle } from '../ui/components';
+
+const PAGE_SIZE = 5;
+type ScreenerView = 'all' | (typeof SCREENER_STATUSES)[number];
 
 const OPERATOR_LABEL: Record<string, string> = {
   eq: 'Equals',
@@ -34,43 +37,47 @@ export function ScreenersPage({
 }) {
   useDocumentTitle('Screeners');
   const { data, error, loading, reload } = useAsync(() => researchRepository.screeners(), []);
+  const [query, setQuery] = useState('');
+  const [view, setView] = useState<ScreenerView>('all');
   const [creating, setCreating] = useState(false);
-  const [details, setDetails] = useState<ScreenerRecord | null>(null);
-  const [preview, setPreview] = useState<ScreenerRecord | null>(null);
-  const [rulesFor, setRulesFor] = useState<ScreenerRecord | null>(null);
-  const [sending, setSending] = useState<string>('');
   const designing = canDesign(user.role);
-  const writing = canWrite(user.role);
-
-  const setStatus = (screener: ScreenerRecord, status: string) => {
-    if (status === 'Archived' && !window.confirm(`Archive ${screener.name}?`)) return;
-    researchRepository
-      .setScreenerStatus(screener.id, status)
-      .then(() => {
-        showToast(`${screener.name} is now ${status}.`);
-        reload();
+  const screeners = data ?? [];
+  const counts = useMemo(() => {
+    return {
+      all: screeners.length,
+      ...Object.fromEntries(SCREENER_STATUSES.map((status) => [status, screeners.filter((item) => item.status === status).length])),
+    } as Record<ScreenerView, number>;
+  }, [screeners]);
+  const rows = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return screeners
+      .filter((screener) => {
+        const inView = view === 'all' || screener.status === view;
+        const haystack = `${screener.name} ${screener.projectName} ${screener.description}`.toLowerCase();
+        return inView && (!needle || haystack.includes(needle));
       })
-      .catch((err) => showToast(errorMessage(err)));
-  };
-
-  const openFull = (id: string, target: 'preview' | 'rules' | 'editor') => {
-    researchRepository
-      .screener(id)
-      .then((screener) => {
-        if (target === 'preview') setPreview(screener);
-        if (target === 'rules') setRulesFor(screener);
-        if (target === 'editor' && screener.schema) {
-          openCreator({ kind: 'screener', id: screener.id, title: screener.name, schema: screener.schema, reload });
-        }
-      })
-      .catch((err) => showToast(errorMessage(err)));
-  };
+      .map((screener) => {
+        const rate = screener.responseCount ? Math.round((screener.eligibleCount / screener.responseCount) * 100) : 0;
+        return {
+          id: screener.id,
+          name: screener.name,
+          nameHref: `/screeners/${screener.id}`,
+          project: screener.projectName || '—',
+          status: screener.status,
+          screened: String(screener.responseCount),
+          eligible: String(screener.eligibleCount),
+          disqualified: String(screener.disqualifiedCount),
+          rate: screener.responseCount ? `${rate}%` : '—',
+          updated: formatDate(screener.updatedAt),
+        };
+      });
+  }, [screeners, query, view]);
 
   return (
     <>
       <PageHeader
         title="Screeners"
-        description="Screening forms use the same builder as surveys. Qualification rules are stored separately from the form."
+        description="Manage participant eligibility screening."
         actions={
           designing ? (
             <button type="button" className="btn btn-primary" onClick={() => setCreating(true)}>
@@ -79,65 +86,61 @@ export function ScreenersPage({
           ) : null
         }
       />
-      <PageState loading={loading} error={error}>
-        <div className="row g-3">
-          {data?.map((screener) => (
-            <div className="col-md-6 col-xl-4" key={screener.id}>
-              <article className="card app-card h-100">
-                <div className="card-body d-flex flex-column">
-                  <div className="d-flex justify-content-between align-items-start gap-2 mb-3">
-                    <h2 className="h5 mb-0">{screener.name}</h2>
-                    <StatusBadge value={screener.status} />
-                  </div>
-                  <p className="text-secondary small mb-2">{screener.projectName || 'No project'}</p>
-                  <p className="mb-2">{screener.description || 'No description.'}</p>
-                  <p className="small text-secondary">
-                    {screener.questionCount} questions · {screener.qualification.rules.length} rules · Updated {formatDate(screener.updatedAt)}
-                  </p>
-                  <p className="small">{screener.responseCount} responses</p>
-                  <div className="d-flex flex-wrap gap-2 mt-auto">
-                    {designing ? (
-                      <button type="button" className="btn btn-sm btn-outline-primary" onClick={() => openFull(screener.id, 'editor')}>
-                        Edit screener
-                      </button>
-                    ) : null}
-                    <button type="button" className="btn btn-sm btn-outline-primary" onClick={() => openFull(screener.id, 'preview')}>
-                      Preview
-                    </button>
-                    <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => openFull(screener.id, 'rules')}>
-                      Rules
-                    </button>
-                    {writing && screener.status !== 'Archived' ? (
-                      <button type="button" className="btn btn-sm btn-outline-primary" onClick={() => setSending(screener.id)}>
-                        Send
-                      </button>
-                    ) : null}
-                    {designing && screener.status === 'Draft' ? (
-                      <button type="button" className="btn btn-sm btn-outline-success" onClick={() => setStatus(screener, 'Active')}>
-                        Publish
-                      </button>
-                    ) : null}
-                    {designing && screener.status !== 'Archived' ? (
-                      <button type="button" className="btn btn-sm btn-outline-danger" onClick={() => setStatus(screener, 'Archived')}>
-                        Archive
-                      </button>
-                    ) : null}
-                    {designing && screener.status === 'Archived' ? (
-                      <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => setStatus(screener, 'Draft')}>
-                        Restore
-                      </button>
-                    ) : null}
-                    {designing ? (
-                      <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => setDetails(screener)}>
-                        Details
-                      </button>
-                    ) : null}
-                  </div>
-                </div>
-              </article>
-            </div>
-          ))}
+      <div className="nav nav-pills project-status-nav flex-wrap gap-2 mb-3" role="tablist" aria-label="Screener status">
+        {([{ id: 'all' as const, label: 'All' }, ...SCREENER_STATUSES.map((status) => ({ id: status, label: status }))]).map((item) => (
+          <button key={item.id} type="button" className={`nav-link ${view === item.id ? 'active' : ''}`} aria-selected={view === item.id} onClick={() => setView(item.id)}>
+            {item.label}
+            <span className="badge rounded-pill ms-2 text-bg-light">{counts[item.id] ?? 0}</span>
+          </button>
+        ))}
+      </div>
+      <div className="row g-2 align-items-end mb-3">
+        <div className="col-md-8 col-lg-6">
+          <label className="form-label" htmlFor="screener-search">
+            Search
+          </label>
+          <input
+            id="screener-search"
+            className="form-control"
+            value={query}
+            placeholder="Screener name, project, or description"
+            onChange={(event) => setQuery(event.target.value)}
+          />
         </div>
+        {query ? (
+          <div className="col-sm-4 col-lg-2">
+            <button type="button" className="btn btn-outline-secondary w-100" onClick={() => setQuery('')}>
+              Clear search
+            </button>
+          </div>
+        ) : null}
+      </div>
+      <PageState loading={loading} error={error}>
+        <p className="text-secondary mb-2">
+          {rows.length} {rows.length === 1 ? 'screener' : 'screeners'}
+        </p>
+        {rows.length === 0 ? (
+          <EmptyState>
+            {screeners.length === 0 ? 'No screeners yet.' : view === 'Archived' ? 'No archived screeners.' : 'No screeners match this search.'}
+          </EmptyState>
+        ) : (
+          <div className="card app-card">
+            <RecordGrid
+              pageSize={PAGE_SIZE}
+              columns={[
+                { name: 'name', title: 'Screener', kind: 'link', minWidth: '12rem' },
+                { name: 'project', title: 'Project', minWidth: '10rem' },
+                { name: 'status', title: 'Status', minWidth: '8rem' },
+                { name: 'screened', title: 'Screened', minWidth: '6rem' },
+                { name: 'eligible', title: 'Eligible', minWidth: '6rem' },
+                { name: 'disqualified', title: 'Disqualified', minWidth: '7rem' },
+                { name: 'rate', title: 'Eligibility', minWidth: '6rem' },
+                { name: 'updated', title: 'Updated', minWidth: '8rem' },
+              ]}
+              rows={rows}
+            />
+          </div>
+        )}
       </PageState>
       {creating ? (
         <SurveyDialog
@@ -155,57 +158,11 @@ export function ScreenersPage({
           }}
         />
       ) : null}
-      {details ? (
-        <SurveyDialog
-          title="Screener details"
-          id="screener-details-edit"
-          schema={formRepository.getForm('screener-details')}
-          data={details}
-          onCustomize={() => openCreator({ kind: 'form', formId: 'screener-details' })}
-          onClose={() => setDetails(null)}
-          onSave={async (record) => {
-            await researchRepository.updateScreener(details.id, record);
-            showToast('Screener details saved.');
-            reload();
-          }}
-        />
-      ) : null}
-      {preview?.schema ? (
-        <SurveyDialog
-          title={`Preview: ${preview.name}`}
-          id={`screener-preview-${preview.id}`}
-          schema={preview.schema}
-          onClose={() => setPreview(null)}
-          onSave={async (record) => previewScreenerResult(preview, record)}
-        />
-      ) : null}
-      {rulesFor ? (
-        <RulesDialog
-          screener={rulesFor}
-          canEdit={designing}
-          onClose={() => setRulesFor(null)}
-          onSaved={() => {
-            showToast('Qualification rules saved.');
-            setRulesFor(null);
-            reload();
-          }}
-        />
-      ) : null}
-      {sending ? (
-        <SendScreenerDialog
-          screenerId={sending}
-          onClose={() => setSending('')}
-          onComplete={(message) => {
-            showToast(message);
-            reload();
-          }}
-        />
-      ) : null}
     </>
   );
 }
 
-function RulesDialog({
+export function RulesDialog({
   screener,
   canEdit,
   onClose,

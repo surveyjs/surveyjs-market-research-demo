@@ -21,6 +21,7 @@ const TONES: Record<string, string> = {
   Pending: 'text-bg-warning',
   Withdrawn: 'text-bg-danger',
   Issued: 'text-bg-success',
+  Distributed: 'text-bg-success',
   Approved: 'text-bg-info',
   Inactive: 'text-bg-secondary',
   'Do not contact': 'text-bg-dark',
@@ -36,12 +37,6 @@ export function escapeHtml(value: string) {
     const map: Record<string, string> = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
     return map[char] ?? char;
   });
-}
-
-export function statusBadgeHtml(value: string) {
-  if (!value) return '<span class="text-secondary">—</span>';
-  const tone = TONES[value] ?? 'text-bg-secondary';
-  return `<span class="badge rounded-pill text-nowrap ${tone}">${escapeHtml(value)}</span>`;
 }
 
 export function linkHtml(href: string, label: string, secondary?: string) {
@@ -85,6 +80,41 @@ export function PageState({ loading, error, children }: { loading: boolean; erro
   return <>{children}</>;
 }
 
+export function ConfirmDialog({
+  title,
+  body,
+  confirmLabel,
+  tone = 'primary',
+  busy = false,
+  error = '',
+  onConfirm,
+  onClose,
+}: {
+  title: string;
+  body: string;
+  confirmLabel: string;
+  tone?: 'primary' | 'danger';
+  busy?: boolean;
+  error?: string;
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <Modal title={title} onClose={onClose} size="sm">
+      <p className="mb-3">{body}</p>
+      {error ? <div className="alert alert-danger">{error}</div> : null}
+      <div className="d-flex justify-content-end gap-2">
+        <button type="button" className="btn btn-outline-secondary" onClick={onClose} disabled={busy}>
+          Cancel
+        </button>
+        <button type="button" className={`btn btn-${tone}`} onClick={onConfirm} disabled={busy}>
+          {busy ? 'Please wait' : confirmLabel}
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
 export function EmptyState({ children }: { children: React.ReactNode }) {
   return <div className="border rounded bg-body-tertiary text-secondary p-3">{children}</div>;
 }
@@ -124,16 +154,14 @@ export function useAsync<T>(load: () => Promise<T>, deps: React.DependencyList) 
   return { data, error, loading, reload, setData };
 }
 
-export function Modal({
+export function SidePanel({
   title,
   onClose,
   children,
-  size = 'lg',
 }: {
   title: string;
   onClose: () => void;
   children: React.ReactNode;
-  size?: 'lg' | 'xl' | 'fullscreen';
 }) {
   const closeRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
@@ -150,7 +178,47 @@ export function Modal({
     };
   }, [onClose]);
 
-  const dialogClass = size === 'fullscreen' ? 'modal-fullscreen' : `modal-${size} modal-dialog-centered survey-modal`;
+  return (
+    <>
+      <div className="side-panel-backdrop" onClick={onClose} />
+      <aside className="side-panel" role="dialog" aria-modal="true" aria-label={title}>
+        <div className="side-panel-header">
+          <h2 className="h5 mb-0">{title}</h2>
+          <button ref={closeRef} type="button" className="btn-close" aria-label="Close" onClick={onClose} />
+        </div>
+        <div className="side-panel-body">{children}</div>
+      </aside>
+    </>
+  );
+}
+
+export function Modal({
+  title,
+  onClose,
+  children,
+  size = 'lg',
+}: {
+  title: string;
+  onClose: () => void;
+  children: React.ReactNode;
+  size?: 'sm' | 'lg' | 'xl' | 'fullscreen';
+}) {
+  const closeRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose();
+    };
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', onKey);
+    closeRef.current?.focus();
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [onClose]);
+
+  const dialogClass = size === 'fullscreen' ? 'modal-fullscreen' : size === 'sm' ? 'modal-sm modal-dialog-centered' : `modal-${size} modal-dialog-centered survey-modal`;
   return (
     <>
       <div className="modal-backdrop fade show" />

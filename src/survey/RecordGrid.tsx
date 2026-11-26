@@ -47,6 +47,8 @@ export function RecordGrid({
       showTitle: false,
       showCompletePage: false,
       widthMode: 'responsive',
+      readOnly: true,
+      readOnlyMode: 'view',
       pages: [
         {
           name: 'grid',
@@ -67,7 +69,6 @@ export function RecordGrid({
                 ...columns.map((column) => ({
                   name: column.name,
                   title: column.title,
-                  readOnly: true,
                   minWidth: column.minWidth ?? '6rem',
                 })),
                 ...hidden,
@@ -84,18 +85,18 @@ export function RecordGrid({
       const columnName = column && 'name' in column ? column.name : undefined;
       const kind = columnName ? kinds.get(columnName) : undefined;
       if (!columnName || !kind || kind === 'text') return;
-      const rowValue = (options.row?.value ?? {}) as RecordRow;
+      const rowValue = (options.row?.value ?? {}) as Record<string, unknown>;
       const host = options.htmlElement;
       host.replaceChildren();
       if (kind === 'html') {
         const block = document.createElement('div');
-        block.innerHTML = rowValue[columnName] ?? '';
+        block.innerHTML = String(rowValue[columnName] ?? '');
         host.append(block);
         return;
       }
       if (kind === 'link') {
-        const href = rowValue[`${columnName}Href`] ?? '';
-        const label = rowValue[columnName] || '—';
+        const href = String(rowValue[`${columnName}Href`] ?? '');
+        const label = String(rowValue[columnName] || '—');
         if (!href) {
           host.textContent = label;
           return;
@@ -106,14 +107,14 @@ export function RecordGrid({
         host.append(anchor);
         return;
       }
-      const label = rowValue[columnName];
+      const label = String(rowValue[columnName] ?? '');
       if (!label) return;
       const button = document.createElement('button');
       button.type = 'button';
       button.className = `btn btn-sm btn-outline-${variants.get(columnName) ?? 'primary'}`;
       button.textContent = label;
       button.dataset.gridAction = columnName;
-      button.dataset.rowId = rowValue.id ?? '';
+      button.dataset.rowId = String(rowValue.id ?? '');
       host.append(button);
     });
     return survey;

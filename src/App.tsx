@@ -7,7 +7,9 @@ import { ParticipantProfilePage } from './pages/ParticipantProfilePage';
 import { ParticipantsPage } from './pages/ParticipantsPage';
 import { ProjectDetailPage } from './pages/ProjectDetailPage';
 import { ProjectsPage } from './pages/ProjectsPage';
+import { ScreenerDetailPage } from './pages/ScreenerDetailPage';
 import { ScreenersPage } from './pages/ScreenersPage';
+import { SurveyDetailPage } from './pages/SurveyDetailPage';
 import { SurveysPage } from './pages/SurveysPage';
 import { onUnauthorized } from './repositories/api';
 import { authRepository } from './repositories/authRepository';
@@ -54,7 +56,9 @@ export default function App() {
           <Route path="/participants" element={<ParticipantsPage {...pageProps} />} />
           <Route path="/participants/:participantId" element={<ParticipantProfilePage {...pageProps} />} />
           <Route path="/surveys" element={<SurveysPage {...pageProps} />} />
+          <Route path="/surveys/:surveyId" element={<SurveyDetailPage {...pageProps} />} />
           <Route path="/screeners" element={<ScreenersPage {...pageProps} />} />
+          <Route path="/screeners/:screenerId" element={<ScreenerDetailPage {...pageProps} />} />
           <Route path="/incentives" element={<IncentivesPage {...pageProps} />} />
           <Route path="*" element={<Navigate to="/projects" replace />} />
         </Routes>

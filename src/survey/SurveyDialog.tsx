@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { errorMessage } from '../repositories/api';
-import { Modal } from '../ui/components';
+import { Modal, SidePanel } from '../ui/components';
 import { SurveyRenderer } from './SurveyRenderer';
 
 export function SurveyDialog({
@@ -16,6 +16,7 @@ export function SurveyDialog({
   onClose,
   onSave,
   configure,
+  presentation = 'modal',
 }: {
   title: string;
   id: string;
@@ -29,13 +30,15 @@ export function SurveyDialog({
   onClose: () => void;
   onSave?: (data: Record<string, unknown>) => Promise<string | void>;
   configure?: (model: import('survey-core').Model) => void;
+  presentation?: 'modal' | 'panel';
 }) {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [saving, setSaving] = useState(false);
 
+  const Frame = presentation === 'panel' ? SidePanel : Modal;
   return (
-    <Modal title={title} onClose={onClose} size="lg">
+    <Frame title={title} onClose={onClose}>
       {onCustomize ? (
         <div className="d-flex justify-content-end mb-2">
           <button type="button" className="btn btn-outline-secondary btn-sm" onClick={onCustomize}>
@@ -67,6 +70,6 @@ export function SurveyDialog({
             .finally(() => setSaving(false));
         }}
       />
-    </Modal>
+    </Frame>
   );
 }

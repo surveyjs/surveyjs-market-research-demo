@@ -93,7 +93,7 @@ export const FORM_DEFINITIONS: FormDefinition[] = [
   {
     id: 'participant-search',
     name: 'Participant search',
-    description: 'Search by surname, participant ID, or email.',
+    description: 'Search by name, participant ID, or email.',
     formType: 'search',
     schema: {
       ...base,
@@ -103,7 +103,7 @@ export const FORM_DEFINITIONS: FormDefinition[] = [
         {
           name: 'search',
           elements: [
-            { type: 'text', name: 'surname', title: 'Surname', placeholder: 'Thompson', minWidth: '12rem' },
+            { type: 'text', name: 'surname', title: 'Name', placeholder: 'Thompson', minWidth: '12rem' },
             {
               type: 'text',
               name: 'participantId',
@@ -225,19 +225,52 @@ export const FORM_DEFINITIONS: FormDefinition[] = [
     schema: {
       ...base,
       title: 'Research project',
+      showTitle: false,
       completeText: 'Save project',
+      showProgressBar: true,
+      progressBarLocation: 'top',
+      progressBarType: 'pages',
+      progressBarShowPageNumbers: true,
       pages: [
         {
-          name: 'project',
+          name: 'basics',
+          title: 'Basics',
+          description: 'Name the project and the client.',
           elements: [
             { type: 'text', name: 'name', title: 'Project name', isRequired: true },
             { type: 'text', name: 'client', title: 'Client', isRequired: true },
             { type: 'comment', name: 'objective', title: 'Objective', isRequired: true, rows: 3 },
-            { type: 'comment', name: 'description', title: 'Description', rows: 2 },
+          ],
+        },
+        {
+          name: 'fieldwork',
+          title: 'Fieldwork',
+          description: 'Set the audience, dates, and how many people to recruit.',
+          elements: [
             { type: 'comment', name: 'targetAudience', title: 'Target audience', isRequired: true, rows: 2 },
             { type: 'text', name: 'startDate', title: 'Fieldwork start', inputType: 'date', isRequired: true },
-            { type: 'text', name: 'endDate', title: 'Fieldwork end', inputType: 'date' },
+            {
+              type: 'text',
+              name: 'endDate',
+              title: 'Fieldwork end',
+              inputType: 'date',
+              validators: [
+                {
+                  type: 'expression',
+                  text: 'Fieldwork end must be on or after the start date.',
+                  expression: '{startDate} empty or {endDate} empty or {endDate} >= {startDate}',
+                },
+              ],
+            },
             { type: 'text', name: 'recruitmentTarget', title: 'Recruitment target', inputType: 'number', isRequired: true, min: 1 },
+          ],
+        },
+        {
+          name: 'setup',
+          title: 'Setup',
+          description: 'Choose a starting status and whether a participant can join more than once.',
+          elements: [
+            { type: 'comment', name: 'description', title: 'Description', rows: 2 },
             dropdown('status', 'Status', PROJECT_STATUSES, true),
             { type: 'boolean', name: 'allowRepeat', title: 'Allow the same participant to join this project more than once', defaultValue: false },
           ],

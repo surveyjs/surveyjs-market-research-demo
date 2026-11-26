@@ -144,7 +144,7 @@ export function seedDatabase(db: Sql): void {
     const date = holiday ? addDays('2025-11-01', index % 80) : addDays('2026-08-12', index % 40);
     const amount = method === 'Video Interview' || method === 'In-person Interview' ? 40 : method === 'Focus Group' ? 30 : 15;
     const incentiveType = amount === 40 ? 'Cash' : 'Voucher';
-    const incentiveStatus = status === 'Completed' ? 'Issued' : status === 'Scheduled' ? 'Approved' : 'Pending';
+    const incentiveStatus = status === 'Completed' ? 'Distributed' : status === 'Scheduled' ? 'Approved' : 'Pending';
     const description = amount === 40 ? `£${amount}` : `£${amount} voucher`;
     const projectId = holiday ? 'proj-holiday' : 'proj-banking';
     const studyId = holiday ? 'study-holiday' : 'study-banking';
@@ -196,8 +196,8 @@ export function seedDatabase(db: Sql): void {
     );
   }
   const emmaIncentives: unknown[][] = [
-    ['inc-emma-brand', 'pa-emma-brand', 'part-emma', 'proj-brand', 'Voucher', 15, '£15 voucher', 'Issued'],
-    ['inc-emma-web', 'pa-emma-web', 'part-emma', 'proj-usability', 'Cash', 40, '£40', 'Issued'],
+    ['inc-emma-brand', 'pa-emma-brand', 'part-emma', 'proj-brand', 'Voucher', 15, '£15 voucher', 'Distributed'],
+    ['inc-emma-web', 'pa-emma-web', 'part-emma', 'proj-usability', 'Cash', 40, '£40', 'Distributed'],
     ['inc-emma-concept', 'pa-emma-concept', 'part-emma', 'proj-concept', 'Voucher', 20, '£20 voucher', 'Pending'],
   ];
   for (const row of emmaIncentives) {

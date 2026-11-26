@@ -48,8 +48,12 @@ function createDemoTools() {
   document.body.append(dock);
 
   return {
-    mark(element: HTMLElement, label = 'SurveyJS') {
-      element.dataset.surveyComponent = label;
+    mark(element: HTMLElement, label = 'SurveyJS renders this') {
+      const parent = element.parentElement;
+      // A card that holds only the survey gets the outline, so the frame and
+      // the "SurveyJS renders this" label are not clipped by the card edge.
+      const frame = parent?.classList.contains('app-card') && parent.children.length === 1 ? parent : element;
+      frame.dataset.surveyComponent = label;
     },
   };
 }

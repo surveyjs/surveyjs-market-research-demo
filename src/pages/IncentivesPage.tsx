@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { INCENTIVE_STATUSES } from '../domain/constants';
 import { formatDate, formatMoney } from '../domain/format';
 import { formRepository } from '../repositories/formRepository';
@@ -9,7 +9,7 @@ import { CreatorState } from '../types/creator';
 import { AuthUser } from '../types/auth';
 import { Incentive, Project } from '../types/research';
 import { canDesign, canWrite } from '../ui/access';
-import { EmptyState, PageHeader, PageState, linkHtml, statusBadgeHtml, useAsync, useDocumentTitle } from '../ui/components';
+import { EmptyState, PageHeader, PageState, linkHtml, useAsync, useDocumentTitle } from '../ui/components';
 
 export function IncentivesPage({
   user,
@@ -21,39 +21,79 @@ export function IncentivesPage({
   showToast: (message: string) => void;
 }) {
   useDocumentTitle('Incentives');
+  const [query, setQuery] = useState('');
   const [status, setStatus] = useState('');
   const [projectId, setProjectId] = useState('');
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<Incentive | null>(null);
   const projects = useAsync(() => researchRepository.projects(), []);
-  const { data, error, loading, reload } = useAsync(() => researchRepository.incentives({ status, projectId }), [status, projectId]);
+  const { data, error, loading, reload } = useAsync(() => researchRepository.incentives({}), []);
   const writing = canWrite(user.role);
   const designing = canDesign(user.role);
+  const incentives = data ?? [];
+  const counts = useMemo(() => {
+    return {
+      all: incentives.length,
+      ...Object.fromEntries(INCENTIVE_STATUSES.map((item) => [item, incentives.filter((entry) => entry.status === item).length])),
+    } as Record<string, number>;
+  }, [incentives]);
+  const visible = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    return incentives.filter((item) => {
+      const haystack = `${item.participantName} ${item.projectName} ${item.description} ${item.incentiveType}`.toLowerCase();
+      return (!status || item.status === status) && (!projectId || item.projectId === projectId) && (!needle || haystack.includes(needle));
+    });
+  }, [incentives, query, status, projectId]);
+  const budget = incentives.filter((item) => item.status !== 'Cancelled').reduce((sum, item) => sum + item.amount, 0);
 
   return (
     <>
       <PageHeader
         title="Incentives"
-        description="Vouchers, cash, and gift cards linked to participants and projects."
+        description="Manage participant compensation and incentive records."
         actions={
           writing ? (
             <button type="button" className="btn btn-primary" onClick={() => setCreating(true)}>
-              Add incentive
+              Create incentive
             </button>
           ) : null
         }
       />
       <div className="row g-3 mb-3">
+        {[
+          ['Records', String(incentives.length)],
+          ['Pending', String(counts.Pending ?? 0)],
+          ['Distributed', String(counts.Distributed ?? 0)],
+          ['Budget', formatMoney(budget)],
+        ].map(([label, value]) => (
+          <div className="col-6 col-lg-3" key={label}>
+            <section className="card app-card h-100">
+              <div className="card-body">
+                <p className="small text-secondary mb-1">{label}</p>
+                <p className="h5 mb-0">{value}</p>
+              </div>
+            </section>
+          </div>
+        ))}
+      </div>
+      <div className="nav nav-pills project-status-nav flex-wrap gap-2 mb-3" role="tablist" aria-label="Incentive status">
+        <button type="button" className={`nav-link ${status === '' ? 'active' : ''}`} aria-selected={status === ''} onClick={() => setStatus('')}>
+          All
+          <span className="badge rounded-pill ms-2 text-bg-light">{counts.all ?? 0}</span>
+        </button>
+        {INCENTIVE_STATUSES.map((item) => (
+          <button key={item} type="button" className={`nav-link ${status === item ? 'active' : ''}`} aria-selected={status === item} onClick={() => setStatus(item)}>
+            {item}
+            <span className="badge rounded-pill ms-2 text-bg-light">{counts[item] ?? 0}</span>
+          </button>
+        ))}
+      </div>
+      <div className="row g-3 mb-3">
         <div className="col-md-4">
-          <label className="form-label" htmlFor="incentive-status">
-            Status
+          <label className="form-label" htmlFor="incentive-search">
+            Search
           </label>
-          <select id="incentive-status" className="form-select" value={status} onChange={(event) => setStatus(event.target.value)}>
-            <option value="">All statuses</option>
-            {INCENTIVE_STATUSES.map((item) => (
-              <option key={item}>{item}</option>
-            ))}
-          </select>
+          <input id="incentive-search" className="form-control" value={query} placeholder="Participant, project, or description" onChange={(event) => setQuery(event.target.value)} />
         </div>
         <div className="col-md-4">
           <label className="form-label" htmlFor="incentive-project">
@@ -70,8 +110,8 @@ export function IncentivesPage({
         </div>
       </div>
       <PageState loading={loading} error={error}>
-        {data && data.length === 0 ? (
-          <EmptyState>No incentives match these filters.</EmptyState>
+        {visible.length === 0 ? (
+          <EmptyState>{incentives.length === 0 ? 'No incentives yet.' : 'No incentives match these filters.'}</EmptyState>
         ) : (
           <div className="card app-card">
             <RecordGrid
@@ -80,22 +120,22 @@ export function IncentivesPage({
                 { name: 'project', title: 'Project', kind: 'html', minWidth: '12rem' },
                 { name: 'type', title: 'Type', minWidth: '7rem' },
                 { name: 'amount', title: 'Amount', minWidth: '6rem' },
-                { name: 'status', title: 'Status', kind: 'html', minWidth: '7rem' },
+                { name: 'status', title: 'Status', minWidth: '8rem' },
                 { name: 'updated', title: 'Updated', minWidth: '8rem' },
                 ...(writing ? [{ name: 'edit', title: ' ', kind: 'action' as const, minWidth: '5rem' }] : []),
               ]}
-              rows={(data ?? []).map((item) => ({
+              rows={visible.map((item) => ({
                 id: item.id,
                 participant: linkHtml(`/participants/${item.participantId}`, item.participantName, item.participantCode),
                 project: linkHtml(`/projects/${item.projectId}`, item.projectName, item.description),
                 type: item.incentiveType,
                 amount: formatMoney(item.amount),
-                status: statusBadgeHtml(item.status),
+                status: item.status,
                 updated: formatDate(item.updatedAt),
                 edit: writing ? 'Edit' : '',
               }))}
               onAction={(_column, row) => {
-                const item = data?.find((entry) => entry.id === row.id);
+                const item = visible.find((entry) => entry.id === row.id);
                 if (item) setEditing(item);
               }}
             />
@@ -107,7 +147,7 @@ export function IncentivesPage({
           title="Add incentive"
           id="incentive-create"
           schema={formRepository.getForm('incentive')}
-          data={{ status: 'Pending', incentiveType: 'Voucher' }}
+          data={{ status: 'Planned', incentiveType: 'Voucher' }}
           onCustomize={designing ? () => openCreator({ kind: 'form', formId: 'incentive' }) : undefined}
           onClose={() => setCreating(false)}
           onSave={async (record) => {

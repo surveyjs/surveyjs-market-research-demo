@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { ageBand } from '../src/domain/age';
-import { PROJECT_STATUSES, RECRUITED_STATUSES, SCHEMA_VERSION } from '../src/domain/constants';
+import { PARTICIPANT_STATUSES, PROJECT_STATUSES, RECRUITED_STATUSES, SCHEMA_VERSION } from '../src/domain/constants';
 import { fullName } from '../src/domain/format';
 import { questionCount } from '../src/domain/questions';
 import { evaluateQualification, parseQualificationConfig, QualificationConfig } from '../src/domain/qualify';
@@ -96,6 +96,7 @@ CREATE TABLE IF NOT EXISTS projects (
   dates_confirmed INTEGER NOT NULL DEFAULT 1,
   recruitment_target INTEGER NOT NULL,
   status TEXT NOT NULL,
+  archived INTEGER NOT NULL DEFAULT 0,
   allow_repeat INTEGER NOT NULL DEFAULT 0,
   sort_order INTEGER NOT NULL DEFAULT 100,
   created_at TEXT NOT NULL,
@@ -281,6 +282,18 @@ function like(value: string): string {
   return `%${value.replace(/[\\%_]/g, '\\$&')}%`;
 }
 
+function ageBandCase(): string {
+  const age = `CAST((julianday('now') - julianday(p.date_of_birth)) / 365.25 AS INTEGER)`;
+  return `CASE
+    WHEN ${age} < 18 THEN 'Under 18'
+    WHEN ${age} <= 24 THEN '18–24'
+    WHEN ${age} <= 34 THEN '25–34'
+    WHEN ${age} <= 44 THEN '35–44'
+    WHEN ${age} <= 54 THEN '45–54'
+    ELSE '55+'
+  END`;
+}
+
 export class ResearchDb {
   constructor(private readonly db: Database.Database) {}
 
@@ -360,7 +373,7 @@ export class ResearchDb {
   }
 
   projectChoices(): Choice[] {
-    return (this.db.prepare('SELECT id, name FROM projects ORDER BY sort_order, name').all() as Row[]).map((row) => ({
+    return (this.db.prepare('SELECT id, name FROM projects WHERE archived = 0 ORDER BY sort_order, name').all() as Row[]).map((row) => ({
       value: str(row, 'id'),
       text: str(row, 'name'),
     }));
@@ -446,30 +459,165 @@ export class ResearchDb {
     return this.getProject(id);
   }
 
+  setParticipantStatus(id: string, status: string): ParticipantProfile {
+    this.must('SELECT id FROM participants WHERE id = ?', id, 'Participant');
+    const next = oneOf(text(status, 'Status', true), PARTICIPANT_STATUSES, 'Status', true);
+    this.db.prepare('UPDATE participants SET status = ?, updated_at = ? WHERE id = ?').run(next, nowIso(), id);
+    return this.getParticipant(id);
+  }
+
   setProjectStatus(id: string, status: string): ProjectDetail {
-    this.must('SELECT id FROM projects WHERE id = ?', id, 'Project');
+    const project = this.must('SELECT id, archived FROM projects WHERE id = ?', id, 'Project');
+    if (num(project, 'archived') === 1) throw new ResearchError('Restore the project before changing its status.');
     const next = oneOf(text(status, 'Status', true), PROJECT_STATUSES, 'Status', true);
     this.db.prepare('UPDATE projects SET status = ?, updated_at = ? WHERE id = ?').run(next, nowIso(), id);
     return this.getProject(id);
   }
 
-  searchParticipants(query: { surname?: string; participantId?: string; email?: string }): ParticipantSummary[] {
+  archiveProject(id: string): ProjectDetail {
+    const project = this.must('SELECT id, archived FROM projects WHERE id = ?', id, 'Project');
+    if (num(project, 'archived') === 1) throw new ResearchError('This project is already archived.');
+    this.db.prepare('UPDATE projects SET archived = 1, updated_at = ? WHERE id = ?').run(nowIso(), id);
+    return this.getProject(id);
+  }
+
+  restoreProject(id: string): ProjectDetail {
+    const project = this.must('SELECT id, archived FROM projects WHERE id = ?', id, 'Project');
+    if (num(project, 'archived') !== 1) throw new ResearchError('This project is not archived.');
+    this.db.prepare('UPDATE projects SET archived = 0, updated_at = ? WHERE id = ?').run(nowIso(), id);
+    return this.getProject(id);
+  }
+
+  duplicateProject(id: string): ProjectDetail {
+    const source = this.must('SELECT * FROM projects WHERE id = ?', id, 'Project');
+    const copyId = randomUUID();
+    const now = nowIso();
+    const name = `Copy of ${str(source, 'name')}`.slice(0, 160);
+    const order = num(this.db.prepare('SELECT COALESCE(MAX(sort_order), 0) + 1 AS next FROM projects').get() as Row, 'next');
+    const save = this.db.transaction(() => {
+      this.db
+        .prepare(
+          `INSERT INTO projects (
+            id, name, client, objective, description, target_audience, start_date, end_date, dates_confirmed,
+            recruitment_target, status, archived, allow_repeat, sort_order, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Draft', 0, ?, ?, ?, ?)`,
+        )
+        .run(
+          copyId,
+          name,
+          str(source, 'client'),
+          str(source, 'objective'),
+          str(source, 'description'),
+          str(source, 'target_audience'),
+          str(source, 'start_date'),
+          str(source, 'end_date'),
+          num(source, 'dates_confirmed'),
+          num(source, 'recruitment_target'),
+          num(source, 'allow_repeat'),
+          order,
+          now,
+          now,
+        );
+      this.db
+        .prepare(
+          `INSERT INTO studies (id, project_id, name, description, method, duration_minutes, status, created_at, updated_at)
+           VALUES (?, ?, ?, ?, 'Online Survey', 20, 'Draft', ?, ?)`,
+        )
+        .run(randomUUID(), copyId, name, str(source, 'objective'), now, now);
+    });
+    save();
+    return this.getProject(copyId);
+  }
+
+  deleteProject(id: string): void {
+    this.must('SELECT id FROM projects WHERE id = ?', id, 'Project');
+    const remove = this.db.transaction(() => {
+      this.db.prepare('DELETE FROM incentives WHERE project_id = ?').run(id);
+      this.db.prepare('UPDATE survey_responses SET project_id = NULL WHERE project_id = ?').run(id);
+      this.db.prepare('UPDATE screener_responses SET project_id = NULL WHERE project_id = ?').run(id);
+      this.db.prepare('UPDATE surveys SET project_id = NULL WHERE project_id = ?').run(id);
+      this.db.prepare('UPDATE screeners SET project_id = NULL WHERE project_id = ?').run(id);
+      this.db.prepare('DELETE FROM participations WHERE project_id = ?').run(id);
+      this.db.prepare('DELETE FROM projects WHERE id = ?').run(id);
+    });
+    remove();
+  }
+
+  searchParticipants(query: {
+    surname?: string;
+    participantId?: string;
+    email?: string;
+    status?: string;
+    recruitmentSource?: string;
+    city?: string;
+    ageGroup?: string;
+    segment?: string;
+    study?: string;
+    screeningStatus?: string;
+  }): ParticipantSummary[] {
     const surname = (query.surname ?? '').trim();
     const participantId = (query.participantId ?? '').trim();
     const email = (query.email ?? '').trim();
+    const status = (query.status ?? '').trim();
+    const recruitmentSource = (query.recruitmentSource ?? '').trim();
+    const city = (query.city ?? '').trim();
+    const ageGroup = (query.ageGroup ?? '').trim();
+    const segment = (query.segment ?? '').trim();
+    const study = (query.study ?? '').trim();
+    const screeningStatus = (query.screeningStatus ?? '').trim();
     const rows = this.db
       .prepare(
         `SELECT p.*,
           (SELECT st.name FROM participations pa JOIN studies st ON st.id = pa.study_id
-            WHERE pa.participant_id = p.id ORDER BY pa.participation_date DESC, pa.created_at DESC LIMIT 1) AS last_study
+            WHERE pa.participant_id = p.id ORDER BY pa.participation_date DESC, pa.created_at DESC LIMIT 1) AS last_study,
+          (SELECT COUNT(DISTINCT pa.project_id) FROM participations pa WHERE pa.participant_id = p.id) AS project_count,
+          (SELECT COUNT(DISTINCT pa.study_id) FROM participations pa WHERE pa.participant_id = p.id AND pa.study_id IS NOT NULL) AS study_count,
+          (SELECT COUNT(*) FROM screener_responses sr WHERE sr.participant_id = p.id) AS screener_count
          FROM participants p
-         WHERE (? = '' OR p.last_name LIKE ? ESCAPE '\\' COLLATE NOCASE)
+         WHERE (? = '' OR p.last_name LIKE ? ESCAPE '\\' COLLATE NOCASE OR p.first_name LIKE ? ESCAPE '\\' COLLATE NOCASE OR p.phone LIKE ? ESCAPE '\\' COLLATE NOCASE)
            AND (? = '' OR p.participant_code LIKE ? ESCAPE '\\' COLLATE NOCASE)
            AND (? = '' OR p.email LIKE ? ESCAPE '\\' COLLATE NOCASE)
+           AND (? = '' OR p.status = ?)
+           AND (? = '' OR p.recruitment_source = ?)
+           AND (? = '' OR p.city LIKE ? ESCAPE '\\' COLLATE NOCASE)
+           AND (? = '' OR p.segment = ?)
+           AND (? = '' OR ${ageBandCase()} = ?)
+           AND (? = '' OR EXISTS (
+             SELECT 1 FROM participations pa
+             JOIN studies st ON st.id = pa.study_id
+             WHERE pa.participant_id = p.id AND st.name LIKE ? ESCAPE '\\' COLLATE NOCASE
+           ))
+           AND (? = '' OR EXISTS (
+             SELECT 1 FROM screener_responses sr
+             WHERE sr.participant_id = p.id AND sr.qualification_status = ?
+           ))
          ORDER BY p.last_name COLLATE NOCASE, p.first_name COLLATE NOCASE
          LIMIT 300`,
       )
-      .all(surname, like(surname), participantId, like(participantId), email, like(email)) as Row[];
+      .all(
+        surname,
+        like(surname),
+        like(surname),
+        like(surname),
+        participantId,
+        like(participantId),
+        email,
+        like(email),
+        status,
+        status,
+        recruitmentSource,
+        recruitmentSource,
+        city,
+        like(city),
+        segment,
+        segment,
+        ageGroup,
+        ageGroup,
+        study,
+        like(study),
+        screeningStatus,
+        screeningStatus,
+      ) as Row[];
     return rows.map((row) => this.mapParticipantSummary(row));
   }
 
@@ -638,7 +786,7 @@ export class ResearchDb {
           now,
         );
       if (input.incentiveType) {
-        const incentiveStatus = input.status === 'Completed' ? 'Issued' : input.status === 'Scheduled' ? 'Approved' : 'Pending';
+        const incentiveStatus = input.status === 'Completed' ? 'Distributed' : input.status === 'Scheduled' ? 'Approved' : 'Pending';
         this.db
           .prepare(
             `INSERT INTO incentives (
@@ -711,6 +859,25 @@ export class ResearchDb {
     });
   }
 
+  duplicateSurvey(id: string, user: AuthUser): SurveyRecord {
+    const source = this.surveyRow(id);
+    const copyId = randomUUID();
+    const now = nowIso();
+    const name = `Copy of ${str(source, 'name')}`.slice(0, 160);
+    this.db
+      .prepare(
+        `INSERT INTO surveys (id, name, description, project_id, schema_json, estimated_duration, status, created_by, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, 'Draft', ?, ?, ?)`,
+      )
+      .run(copyId, name, str(source, 'description'), str(source, 'project_id') || null, str(source, 'schema_json'), num(source, 'estimated_duration'), user.id, now, now);
+    return this.getSurvey(copyId);
+  }
+
+  deleteSurvey(id: string): void {
+    this.surveyRow(id);
+    this.db.prepare('DELETE FROM surveys WHERE id = ?').run(id);
+  }
+
   surveyResponses(id: string): SurveyResponseRecord[] {
     this.surveyRow(id);
     const rows = this.db
@@ -760,7 +927,9 @@ export class ResearchDb {
     const rows = this.db
       .prepare(
         `SELECT s.*, pr.name AS project_name,
-          (SELECT COUNT(*) FROM screener_responses r WHERE r.screener_id = s.id) AS response_count
+          (SELECT COUNT(*) FROM screener_responses r WHERE r.screener_id = s.id) AS response_count,
+          (SELECT COUNT(*) FROM screener_responses r WHERE r.screener_id = s.id AND r.qualification_status = 'Qualified') AS eligible_count,
+          (SELECT COUNT(*) FROM screener_responses r WHERE r.screener_id = s.id AND r.qualification_status = 'Disqualified') AS disqualified_count
          FROM screeners s LEFT JOIN projects pr ON pr.id = s.project_id
          ORDER BY CASE s.status WHEN 'Active' THEN 0 WHEN 'Draft' THEN 1 ELSE 2 END, s.name`,
       )
@@ -829,6 +998,25 @@ export class ResearchDb {
       projectId: current.projectId,
       status,
     });
+  }
+
+  duplicateScreener(id: string, user: AuthUser): ScreenerRecord {
+    const source = this.screenerRow(id);
+    const copyId = randomUUID();
+    const now = nowIso();
+    const name = `Copy of ${str(source, 'name')}`.slice(0, 160);
+    this.db
+      .prepare(
+        `INSERT INTO screeners (id, name, description, project_id, schema_json, rules_json, status, created_by, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, 'Draft', ?, ?, ?)`,
+      )
+      .run(copyId, name, str(source, 'description'), str(source, 'project_id') || null, str(source, 'schema_json'), str(source, 'rules_json'), user.id, now, now);
+    return this.getScreener(copyId);
+  }
+
+  deleteScreener(id: string): void {
+    this.screenerRow(id);
+    this.db.prepare('DELETE FROM screeners WHERE id = ?').run(id);
   }
 
   submitScreener(body: unknown, user: AuthUser): ScreeningRecord {
@@ -1076,7 +1264,9 @@ export class ResearchDb {
   private screenerRow(id: string): Row {
     return this.must(
       `SELECT s.*, pr.name AS project_name,
-        (SELECT COUNT(*) FROM screener_responses r WHERE r.screener_id = s.id) AS response_count
+        (SELECT COUNT(*) FROM screener_responses r WHERE r.screener_id = s.id) AS response_count,
+        (SELECT COUNT(*) FROM screener_responses r WHERE r.screener_id = s.id AND r.qualification_status = 'Qualified') AS eligible_count,
+        (SELECT COUNT(*) FROM screener_responses r WHERE r.screener_id = s.id AND r.qualification_status = 'Disqualified') AS disqualified_count
        FROM screeners s LEFT JOIN projects pr ON pr.id = s.project_id WHERE s.id = ?`,
       id,
       'Screener',
@@ -1122,6 +1312,7 @@ export class ResearchDb {
       recruitmentTarget: num(row, 'recruitment_target'),
       recruited: num(row, 'recruited'),
       status: str(row, 'status'),
+      archived: num(row, 'archived') === 1,
       allowRepeat: num(row, 'allow_repeat') === 1,
       createdAt: str(row, 'created_at'),
       updatedAt: str(row, 'updated_at'),
@@ -1139,7 +1330,12 @@ export class ResearchDb {
       status: str(row, 'status'),
       segment: str(row, 'segment'),
       city: str(row, 'city'),
+      recruitmentSource: str(row, 'recruitment_source'),
       lastStudy: str(row, 'last_study'),
+      projectCount: num(row, 'project_count'),
+      studyCount: num(row, 'study_count'),
+      screenerCount: num(row, 'screener_count'),
+      createdAt: str(row, 'created_at'),
     };
   }
 
@@ -1217,6 +1413,8 @@ export class ResearchDb {
       status: str(row, 'status'),
       questionCount: questionCount(schema),
       responseCount: num(row, 'response_count'),
+      eligibleCount: num(row, 'eligible_count'),
+      disqualifiedCount: num(row, 'disqualified_count'),
       qualification: parseQualificationConfig(jsonObject(str(row, 'rules_json'))),
       createdAt: str(row, 'created_at'),
       updatedAt: str(row, 'updated_at'),

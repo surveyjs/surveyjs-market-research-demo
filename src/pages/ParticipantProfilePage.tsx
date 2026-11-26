@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { SendScreenerDialog } from '../components/screeners/SendScreenerDialog';
+import { PARTICIPANT_STATUSES } from '../domain/constants';
 import { formatDate, formatDateTime, formatMoney } from '../domain/format';
+import { errorMessage } from '../repositories/api';
 import { formRepository } from '../repositories/formRepository';
 import { researchRepository } from '../repositories/researchRepository';
 import { RecordGrid } from '../survey/RecordGrid';
@@ -10,7 +12,7 @@ import { CreatorState } from '../types/creator';
 import { AuthUser } from '../types/auth';
 import { ScreeningRecord } from '../types/research';
 import { canDesign, canWrite } from '../ui/access';
-import { escapeHtml, linkHtml, PageHeader, PageState, StatusBadge, statusBadgeHtml, useAsync, useDocumentTitle } from '../ui/components';
+import { escapeHtml, linkHtml, PageHeader, PageState, StatusBadge, useAsync, useDocumentTitle } from '../ui/components';
 
 export function ParticipantProfilePage({
   user,
@@ -28,6 +30,7 @@ export function ParticipantProfilePage({
   const [screener, setScreener] = useState(false);
   const [note, setNote] = useState(false);
   const [view, setView] = useState<ScreeningRecord | null>(null);
+  const [tab, setTab] = useState<'details' | 'participation' | 'screening' | 'notes'>('details');
   const writing = canWrite(user.role);
   const designing = canDesign(user.role);
   const person = data?.participant;
@@ -49,33 +52,79 @@ export function ParticipantProfilePage({
           </nav>
           <section className="card app-card mb-3">
             <div className="card-body">
-              <PageHeader
-                compact
-                title={person.fullName}
-                description={`${person.participantCode} · ${person.city || 'City not set'} · ${person.preferredDevice || 'Device not set'}`}
-                actions={
-                  writing ? (
-                    <>
-                      <button type="button" className="btn btn-sm btn-outline-primary" onClick={() => setEditing(true)}>
-                        Edit participant
-                      </button>
-                      <button type="button" className="btn btn-sm btn-outline-primary" onClick={() => setParticipation(true)}>
-                        Add study participation
-                      </button>
-                      <button type="button" className="btn btn-sm btn-primary" onClick={() => setScreener(true)}>
-                        Send screener
-                      </button>
-                    </>
-                  ) : null
-                }
-              />
-              <div className="d-flex flex-wrap gap-2">
-                <StatusBadge value={person.status} />
-                <StatusBadge value={person.segment} />
-                <StatusBadge value={person.consentStatus} />
+              <div className="d-flex gap-3">
+                <div className="person-avatar" aria-hidden="true">
+                  {initials(person.fullName)}
+                </div>
+                <div className="flex-grow-1">
+                  <PageHeader
+                    compact
+                    title={person.fullName}
+                    description={`${person.participantCode} · ${person.segment || 'No segment'} · ${person.city || 'City not set'}`}
+                    actions={
+                      writing ? (
+                        <>
+                          <button type="button" className="btn btn-sm btn-outline-primary" onClick={() => setEditing(true)}>
+                            Edit participant
+                          </button>
+                          <button type="button" className="btn btn-sm btn-outline-primary" onClick={() => setParticipation(true)}>
+                            Add study participation
+                          </button>
+                          <button type="button" className="btn btn-sm btn-primary" onClick={() => setScreener(true)}>
+                            Send screener
+                          </button>
+                        </>
+                      ) : null
+                    }
+                  />
+                  <div className="d-flex flex-wrap align-items-center gap-2">
+                    <StatusBadge value={person.status} />
+                    <StatusBadge value={person.segment} />
+                    <StatusBadge value={person.consentStatus} />
+                    {writing ? (
+                      <label className="d-flex align-items-center gap-2 small mb-0 ms-md-2">
+                        Change status
+                        <select
+                          className="form-select form-select-sm"
+                          value={person.status}
+                          onChange={(event) => {
+                            researchRepository
+                              .setParticipantStatus(person.id, event.target.value)
+                              .then(() => {
+                                showToast(`Status set to ${event.target.value}.`);
+                                reload();
+                              })
+                              .catch((err) => showToast(errorMessage(err)));
+                          }}
+                        >
+                          {PARTICIPANT_STATUSES.map((status) => (
+                            <option key={status}>{status}</option>
+                          ))}
+                        </select>
+                      </label>
+                    ) : null}
+                  </div>
+                </div>
               </div>
             </div>
           </section>
+          <ul className="nav nav-tabs mb-3" role="tablist">
+            {(
+              [
+                ['details', 'Overview'],
+                ['participation', 'Projects'],
+                ['screening', 'Screeners'],
+                ['notes', 'Activity'],
+              ] as const
+            ).map(([id, label]) => (
+              <li className="nav-item" key={id}>
+                <button type="button" className={`nav-link ${tab === id ? 'active' : ''}`} aria-selected={tab === id} onClick={() => setTab(id)}>
+                  {label}
+                </button>
+              </li>
+            ))}
+          </ul>
+          {tab === 'details' ? (
           <div className="row g-3">
             <div className="col-lg-6">
               <section className="card app-card h-100">
@@ -113,6 +162,9 @@ export function ParticipantProfilePage({
                 </div>
               </section>
             </div>
+          </div>
+          ) : null}
+          {tab === 'participation' ? (
             <div className="col-12">
               <section className="card app-card">
                 <div className="card-body">
@@ -133,7 +185,7 @@ export function ParticipantProfilePage({
                         { name: 'date', title: 'Date', minWidth: '7rem' },
                         { name: 'method', title: 'Method', minWidth: '8rem' },
                         { name: 'incentive', title: 'Incentive', kind: 'html', minWidth: '10rem' },
-                        { name: 'status', title: 'Status', kind: 'html', minWidth: '7rem' },
+                        { name: 'status', title: 'Status', minWidth: '8rem' },
                       ]}
                       rows={data.participations.map((item) => ({
                         id: item.id,
@@ -144,13 +196,15 @@ export function ParticipantProfilePage({
                           item.incentiveAmount != null
                             ? `${escapeHtml(item.incentiveDescription || '—')}<div class="small text-secondary">${escapeHtml(`${formatMoney(item.incentiveAmount)} · ${item.incentiveStatus ?? ''}`)}</div>`
                             : escapeHtml(item.incentiveDescription || '—'),
-                        status: statusBadgeHtml(item.status),
+                        status: item.status,
                       }))}
                     />
                   )}
                 </div>
               </section>
             </div>
+          ) : null}
+          {tab === 'screening' ? (
             <div className="col-12">
               <section className="card app-card">
                 <div className="card-body">
@@ -162,7 +216,7 @@ export function ParticipantProfilePage({
                       columns={[
                         { name: 'screener', title: 'Screener', minWidth: '10rem' },
                         { name: 'submitted', title: 'Submitted', minWidth: '8rem' },
-                        { name: 'result', title: 'Result', kind: 'html', minWidth: '8rem' },
+                        { name: 'result', title: 'Result', minWidth: '9rem' },
                         { name: 'reason', title: 'Reason', minWidth: '12rem' },
                         { name: 'view', title: ' ', kind: 'action', actionVariant: 'secondary', minWidth: '9rem' },
                       ]}
@@ -170,7 +224,7 @@ export function ParticipantProfilePage({
                         id: item.id,
                         screener: item.screenerName,
                         submitted: formatDate(item.submittedAt),
-                        result: statusBadgeHtml(item.qualificationStatus),
+                        result: item.qualificationStatus,
                         reason: item.reason || '—',
                         view: 'View responses',
                       }))}
@@ -183,6 +237,8 @@ export function ParticipantProfilePage({
                 </div>
               </section>
             </div>
+          ) : null}
+          {tab === 'notes' ? (
             <div className="col-12">
               <section className="card app-card">
                 <div className="card-body">
@@ -231,11 +287,12 @@ export function ParticipantProfilePage({
                 </div>
               </section>
             </div>
-          </div>
+          ) : null}
           {editing ? (
             <SurveyDialog
               title="Edit participant"
               id="participant-edit"
+              presentation="panel"
               schema={formRepository.getForm('participant')}
               data={person}
               onCustomize={designing ? () => openCreator({ kind: 'form', formId: 'participant' }) : undefined}
@@ -304,4 +361,13 @@ export function ParticipantProfilePage({
       ) : null}
     </PageState>
   );
+}
+
+function initials(name: string): string {
+  return name
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? '')
+    .join('');
 }
